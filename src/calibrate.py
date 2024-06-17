@@ -5,36 +5,68 @@ import yaml
 from src.triangulate import get_3d_point_cam1_2_from_coordinates, rotation_matrix_from_params
 from src.features import detectAndCompute, getMatches
 from scipy.optimize import minimize
-from random import randrange
+from random import randrange,sample
+
+calibration_folder = "calibration"
+
+def save_calibration_custom(R,t, filename):
+    np.savez(filename+'.npz', array1=R, array2=t)
+
+def load_calibration_custom(filename):
+    loaded = np.load(filename+'.npz')
+    return loaded['array1'],loaded['array2']
+
+def save_calibration_params(params, filename):
+    np.savetxt(filename+'.csv', params, delimiter=',')
+
+def load_calibration_params(filename):
+    loaded =np.loadtxt(filename+'.csv', delimiter=',')
+    return loaded
+
 
 def computeInliers(R, t, keypoints_cam1, keypoints_cam2, threshold, image_width, image_height):
     inliers = []
     for i in range(len(keypoints_cam1)):
-        _,_,residual = get_3d_point_cam1_2_from_coordinates(keypoints_cam1[i], keypoints_cam2[i], image_width, image_height, R, t)
-        if residual < threshold:
+        _,_,residual_distance = get_3d_point_cam1_2_from_coordinates(keypoints_cam1[i], keypoints_cam2[i], image_width, image_height, R, t)
+        if residual_distance < threshold:
             inliers.append(i)
     return inliers
 
 
-def getCalibrationFrom3Matching(keypoints_cam1,keypoints_cam2, initial_params,bnds, image_width, image_height,verbose=False):
+def getCalibrationFrom3Matching(keypoints_cam1,keypoints_cam2, initial_params, image_width, image_height,bnds,verbose=False):
+    if len(keypoints_cam1) ==0:
+        raise Exception("No matches found")
+    
+    if len(keypoints_cam1) != len(keypoints_cam2):
+        raise Exception("Inconsistent nb of matches")
+    
     def optimizeRT(params):
         R = rotation_matrix_from_params(params[:3])
         t = params[3:]
         if verbose:
+            print("getCalibrationFrom3Matching")
             print("R",R)
             print("t", t)
             print("keypoints_cam1",keypoints_cam1)
         total_residual = 0.
         for i in range(len(keypoints_cam1)):
-            _,_,residual = get_3d_point_cam1_2_from_coordinates(keypoints_cam1[i], keypoints_cam2[i], image_width, image_height, R, t)
-            total_residual += residual
+            _,_,residual_distance_normalized = get_3d_point_cam1_2_from_coordinates(keypoints_cam1[i], keypoints_cam2[i], image_width, image_height, R, t)
+            total_residual += residual_distance_normalized
+        #print("total_residual",total_residual)
         return total_residual
     result = minimize(optimizeRT, initial_params, bounds=bnds)
     optimized_params = result.x
-    return optimized_params
+    residual_distance_normalized = result.fun / len(keypoints_cam1)
+    return optimized_params,residual_distance_normalized
 
 
-def calibrate_left_right(imLeft:cv.Mat, imRight:cv.Mat):
+def calibrate_left_right(imLeft:cv.Mat, imRight:cv.Mat, initial_params,bnds):
+    print("calibrate_left_right")
+    print(f"initial_params {initial_params}")
+    print(f"bnds {bnds}")
+    max_iter = 300
+    num_elements = 4
+    inlier_threshold = 0.01 #1%
     kpts1, desc1 = detectAndCompute(imLeft)
     kpts2, desc2 = detectAndCompute(imRight)
     #kpts to uv
@@ -44,41 +76,73 @@ def calibrate_left_right(imLeft:cv.Mat, imRight:cv.Mat):
     nn_matches = getMatches(desc1, desc2)
     matched1 = []
     matched2 = []
-    nn_match_ratio = 0.8 # Nearest neighbor matching ratio
-    for m, n in nn_matches:
+    nn_match_ratio = 0.5 # Nearest neighbor matching ratio
+    good_matches = [[0, 0] for i in range(len(nn_matches))] 
+    for i, (m, n) in enumerate(nn_matches):
         if m.distance < nn_match_ratio * n.distance:
             matched1.append(uv1[m.queryIdx])
             matched2.append(uv2[m.trainIdx])
-    print(f'nb good matches {len(matched1)}')
-    angle_max = np.pi*7./180.
-    dt_max = 0.1
-    bnds = ((-angle_max, angle_max), (-angle_max, angle_max),(-angle_max, angle_max),(1.12-dt_max, 1.12+dt_max),(-dt_max,dt_max),(-dt_max,dt_max))
-    initial_params = [0, 0, 0, 1.12,0,0]
+            good_matches[i] = [1, 0] 
+    Matched = cv.drawMatchesKnn(imLeft, 
+                             kpts1, 
+                             imRight, 
+                             kpts2, 
+                             nn_matches, 
+                             outImg=None, 
+                             matchColor=(0, 155, 0), 
+                             singlePointColor=(0, 255, 255), 
+                             matchesMask=good_matches, 
+                             flags=0
+                             ) 
+  
+# Displaying the image  
+    cv.imwrite('Match.jpg', Matched)
+    #cv.waitKey(0)
+    print(f'nb good matches {len(matched1)} out of {len(nn_matches)}')
     nb_iter = 0
     nb_good_matches = len(matched1)
     best_result = {
         "max_inliers": 0,
         "R":[],
-        "t":[]
+        "t":[],
+        "params":[],
     }
-    while nb_iter<100:
-        i1 = randrange(0,nb_good_matches,1)
-        i2 = randrange(0,nb_good_matches,1)
-        i3 = randrange(0,nb_good_matches,1)
-        sub_uv1 = [matched1[i1], matched1[i2], matched1[i3]]
-        sub_uv2 = [matched2[i1], matched2[i2], matched2[i3]]
-        
-        optimized_params = getCalibrationFrom3Matching(sub_uv1, sub_uv2, initial_params, bnds, imLeft.shape[1], imLeft.shape[0])
+    while nb_iter<max_iter:
+        indices = sample(range(nb_good_matches), num_elements)
+        sub_uv1 = [matched1[i] for i in indices]
+        sub_uv2 = [matched2[i] for i in indices]
+        optimized_params,residual = getCalibrationFrom3Matching(sub_uv1, sub_uv2, initial_params, imLeft.shape[1], imLeft.shape[0],bnds)
         optimized_R = rotation_matrix_from_params(optimized_params[:3])
         optimized_t = optimized_params[3:]
-        inliers = computeInliers(optimized_R, optimized_t, matched1, matched2, 0.1, imLeft.shape[1], imLeft.shape[0])
+
+        inliers = computeInliers(optimized_R, optimized_t, matched1, matched2, inlier_threshold, imLeft.shape[1], imLeft.shape[0])
         nb_inliers = len(inliers)
+        if nb_inliers ==0:
+            continue
+
+        residual_per_inlier = residual/nb_inliers
         if nb_inliers > best_result["max_inliers"]:
-            print(f'new best result with {nb_inliers} inliers')
+            print(f'new best result with {nb_inliers} inliers, iteration is {nb_iter}, residual_per_inlier is {residual_per_inlier}')
+            print("optimized_params", optimized_params)
             best_result["max_inliers"] = nb_inliers
             best_result["R"] = optimized_R
+            best_result["params"] = optimized_params
             best_result["t"] = optimized_t
         nb_iter+=1
+    
+    sub_uv1=[matched1[i] for i in inliers]
+    sub_uv2=[matched2[i] for i in inliers]
+    optimized_params, residual = getCalibrationFrom3Matching(sub_uv1, sub_uv2, initial_params, imLeft.shape[1], imLeft.shape[0],bnds)
+    print("optimized_params",optimized_params, "residual", residual)
+    optimized_R = rotation_matrix_from_params(optimized_params[:3])
+    optimized_t = optimized_params[3:]
+    inliers = computeInliers(optimized_R, optimized_t, matched1, matched2, inlier_threshold, imLeft.shape[1], imLeft.shape[0])
+    nb_inliers = len(inliers)
+    print(f'refined best result with {nb_inliers} inliers')
+    #best_result["max_inliers"] = nb_inliers
+    #best_result["R"] = optimized_R
+    #best_result["t"] = optimized_t
+    print("refined optimized_R on all inliers", optimized_R)
 
     return best_result
 
@@ -157,7 +221,7 @@ def compute_and_save_calibration(images,chessboard_size,is_cube:bool):
     if len(objpoints) > 0 and len(imgpoints) > 0 and len(objpoints) == len(imgpoints):
         # Calibrate camera
         ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
-        save_calibration(mtx,dist,ret, "calibration_matrix.yaml")
+        save_calibration_custom(mtx,dist,ret, "calibration_matrix.yaml")
         return mtx, dist
     print("Not enough points for calibration or mismatched number of object and image points.")
     return None, None
