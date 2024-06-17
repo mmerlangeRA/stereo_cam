@@ -1,23 +1,86 @@
+import os
 import numpy as np
 import cv2 as cv
 import yaml
-import os
+from src.triangulate import get_3d_point_cam1_2_from_coordinates, rotation_matrix_from_params
+from src.features import detectAndCompute, getMatches
+from scipy.optimize import minimize
+from random import randrange
 
-def compute_360_intrinsics(image_width, image_height):
-    # Principal point is the center of the image
-    cx = image_width / 2
-    cy = image_height / 2
+def computeInliers(R, t, keypoints_cam1, keypoints_cam2, threshold, image_width, image_height):
+    inliers = []
+    for i in range(len(keypoints_cam1)):
+        _,_,residual = get_3d_point_cam1_2_from_coordinates(keypoints_cam1[i], keypoints_cam2[i], image_width, image_height, R, t)
+        if residual < threshold:
+            inliers.append(i)
+    return inliers
 
-    # Approximate focal lengths for equirectangular image
-    fx = image_width / (2 * np.pi)
-    fy = image_height / np.pi
 
-    # Construct the intrinsic matrix
-    K = np.array([[fx, 0, cx],
-                  [0, fy, cy],
-                  [0, 0, 1]])
-    
-    return K
+def getCalibrationFrom3Matching(keypoints_cam1,keypoints_cam2, initial_params,bnds, image_width, image_height,verbose=False):
+    def optimizeRT(params):
+        R = rotation_matrix_from_params(params[:3])
+        t = params[3:]
+        if verbose:
+            print("R",R)
+            print("t", t)
+            print("keypoints_cam1",keypoints_cam1)
+        total_residual = 0.
+        for i in range(len(keypoints_cam1)):
+            _,_,residual = get_3d_point_cam1_2_from_coordinates(keypoints_cam1[i], keypoints_cam2[i], image_width, image_height, R, t)
+            total_residual += residual
+        return total_residual
+    result = minimize(optimizeRT, initial_params, bounds=bnds)
+    optimized_params = result.x
+    return optimized_params
+
+
+def calibrate_left_right(imLeft:cv.Mat, imRight:cv.Mat):
+    kpts1, desc1 = detectAndCompute(imLeft)
+    kpts2, desc2 = detectAndCompute(imRight)
+    #kpts to uv
+    print(kpts1[0].pt)
+    uv1 = [[k.pt[0], k.pt[1]] for k in kpts1]
+    uv2 = [[k.pt[0], k.pt[1]] for k in kpts2]
+    nn_matches = getMatches(desc1, desc2)
+    matched1 = []
+    matched2 = []
+    nn_match_ratio = 0.8 # Nearest neighbor matching ratio
+    for m, n in nn_matches:
+        if m.distance < nn_match_ratio * n.distance:
+            matched1.append(uv1[m.queryIdx])
+            matched2.append(uv2[m.trainIdx])
+    print(f'nb good matches {len(matched1)}')
+    angle_max = np.pi*7./180.
+    dt_max = 0.1
+    bnds = ((-angle_max, angle_max), (-angle_max, angle_max),(-angle_max, angle_max),(1.12-dt_max, 1.12+dt_max),(-dt_max,dt_max),(-dt_max,dt_max))
+    initial_params = [0, 0, 0, 1.12,0,0]
+    nb_iter = 0
+    nb_good_matches = len(matched1)
+    best_result = {
+        "max_inliers": 0,
+        "R":[],
+        "t":[]
+    }
+    while nb_iter<100:
+        i1 = randrange(0,nb_good_matches,1)
+        i2 = randrange(0,nb_good_matches,1)
+        i3 = randrange(0,nb_good_matches,1)
+        sub_uv1 = [matched1[i1], matched1[i2], matched1[i3]]
+        sub_uv2 = [matched2[i1], matched2[i2], matched2[i3]]
+        
+        optimized_params = getCalibrationFrom3Matching(sub_uv1, sub_uv2, initial_params, bnds, imLeft.shape[1], imLeft.shape[0])
+        optimized_R = rotation_matrix_from_params(optimized_params[:3])
+        optimized_t = optimized_params[3:]
+        inliers = computeInliers(optimized_R, optimized_t, matched1, matched2, 0.1, imLeft.shape[1], imLeft.shape[0])
+        nb_inliers = len(inliers)
+        if nb_inliers > best_result["max_inliers"]:
+            print(f'new best result with {nb_inliers} inliers')
+            best_result["max_inliers"] = nb_inliers
+            best_result["R"] = optimized_R
+            best_result["t"] = optimized_t
+        nb_iter+=1
+
+    return best_result
 
 
 def save_calibration(mtx, dist, rmse,fname="calibration_matrix.yaml"):
