@@ -47,7 +47,7 @@ def triangulate_point(ray1, ray2, t, R_matrix, verbose=False):
         predicted_b = A @ lambdas
         print("predicted_b", predicted_b)
 
-    return point_3d_1,point_3d_2,residual_distance_normalized
+    return point_3d_1,lambda2 * ray2,residual_distance_normalized
 
 def get_3d_point_cam1_2_from_coordinates(keypoints_cam1, keypoints_cam2,image_width, image_height,R, t, verbose=False):
     point_image1 = np.array(keypoints_cam1) 
