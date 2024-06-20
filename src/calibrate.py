@@ -9,20 +9,12 @@ from random import randrange,sample
 
 calibration_folder = "calibration"
 
-def save_calibration_custom(R,t, filename):
-    np.savez(filename+'.npz', array1=R, array2=t)
-
-def load_calibration_custom(filename):
-    loaded = np.load(filename+'.npz')
-    return loaded['array1'],loaded['array2']
-
 def save_calibration_params(params, filename):
     np.savetxt(filename+'.csv', params, delimiter=',')
 
 def load_calibration_params(filename):
     loaded =np.loadtxt(filename+'.csv', delimiter=',')
     return loaded
-
 
 def computeInliers(R, t, keypoints_cam1, keypoints_cam2, threshold, image_width, image_height):
     inliers = []
@@ -60,13 +52,13 @@ def getCalibrationFrom3Matching(keypoints_cam1,keypoints_cam2, initial_params, i
     return optimized_params,residual_distance_normalized
 
 
-def calibrate_left_right(imLeft:cv.Mat, imRight:cv.Mat, initial_params,bnds):
+def calibrate_left_right(imLeft:cv.Mat, imRight:cv.Mat, initial_params,bnds,inlier_threshold):
     print("calibrate_left_right")
     print(f"initial_params {initial_params}")
     print(f"bnds {bnds}")
-    max_iter = 300
+    max_iter = 500
+    prob = 0.95
     num_elements = 4
-    inlier_threshold = 0.01 #1%
     kpts1, desc1 = detectAndCompute(imLeft)
     kpts2, desc2 = detectAndCompute(imRight)
     #kpts to uv
@@ -128,12 +120,14 @@ def calibrate_left_right(imLeft:cv.Mat, imRight:cv.Mat, initial_params,bnds):
             best_result["R"] = optimized_R
             best_result["params"] = optimized_params
             best_result["t"] = optimized_t
+            max_iter = np.log(1.-prob)/np.log(1.- pow(nb_inliers/len(matched1),num_elements))
+            print(f"now iter is {nb_iter} and max_iter is {max_iter}")
         nb_iter+=1
     
     sub_uv1=[matched1[i] for i in inliers]
     sub_uv2=[matched2[i] for i in inliers]
     optimized_params, residual = getCalibrationFrom3Matching(sub_uv1, sub_uv2, initial_params, imLeft.shape[1], imLeft.shape[0],bnds)
-    print("optimized_params",optimized_params, "residual", residual)
+
     optimized_R = rotation_matrix_from_params(optimized_params[:3])
     optimized_t = optimized_params[3:]
     inliers = computeInliers(optimized_R, optimized_t, matched1, matched2, inlier_threshold, imLeft.shape[1], imLeft.shape[0])
@@ -142,7 +136,7 @@ def calibrate_left_right(imLeft:cv.Mat, imRight:cv.Mat, initial_params,bnds):
     #best_result["max_inliers"] = nb_inliers
     #best_result["R"] = optimized_R
     #best_result["t"] = optimized_t
-    print("refined optimized_R on all inliers", optimized_R)
+    print("refined optimized_params on all inliers", optimized_params)
 
     return best_result
 
