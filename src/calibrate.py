@@ -52,7 +52,7 @@ def getCalibrationFrom3Matching(keypoints_cam1,keypoints_cam2, initial_params, i
     return optimized_params,residual_distance_normalized
 
 
-def calibrate_left_right(imLeft:cv.Mat, imRight:cv.Mat, initial_params,bnds,inlier_threshold):
+def calibrate_left_right(imLeft:cv.Mat, imRight:cv.Mat, initial_params,bnds,inlier_threshold,nn_match_ratio=0.5):
     print("calibrate_left_right")
     print(f"initial_params {initial_params}")
     print(f"bnds {bnds}")
@@ -68,7 +68,6 @@ def calibrate_left_right(imLeft:cv.Mat, imRight:cv.Mat, initial_params,bnds,inli
     nn_matches = getMatches(desc1, desc2)
     matched1 = []
     matched2 = []
-    nn_match_ratio = 0.5 # Nearest neighbor matching ratio
     good_matches = [[0, 0] for i in range(len(nn_matches))] 
     for i, (m, n) in enumerate(nn_matches):
         if m.distance < nn_match_ratio * n.distance:

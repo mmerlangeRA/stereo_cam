@@ -2,6 +2,9 @@ import os
 import numpy as np
 import cv2 as cv
 from scipy.spatial.transform import Rotation as SciPyRotation
+import scipy.spatial
+import trimesh
+
 
 def rotation_matrix_from_params(params):
     """Construct a rotation matrix from parameters."""
@@ -59,3 +62,9 @@ def get_3d_point_cam1_2_from_coordinates(keypoints_cam1, keypoints_cam2,image_wi
     point_3d_cam1,point_3d_cam2,residual_distance_normalized = triangulate_point(ray1, ray2, t, R, verbose)
     return point_3d_cam1,point_3d_cam2,residual_distance_normalized
 
+def triangulate_points_to_obj(points):
+    delaunay = scipy.spatial.Delaunay(points)
+    # Create the mesh using the vertices and faces from the triangulation
+    mesh = trimesh.Trimesh(vertices=points, faces=delaunay.simplices,use_embree=True)
+    # Export the mesh to an OBJ file
+    mesh.export('output_mesh.obj')

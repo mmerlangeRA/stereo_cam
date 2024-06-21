@@ -3,8 +3,9 @@ import os
 import numpy as np
 import cv2 as cv
 from scipy.optimize import minimize
+from src.features import detectAndCompute, getMatches
 from src.calibrate import calibrate_left_right, getCalibrationFrom3Matching, load_calibration_params, save_calibration_params
-from src.triangulate import rotation_matrix_from_params, triangulate_point,get_3d_point_cam1_2_from_coordinates
+from src.triangulate import rotation_matrix_from_params, triangulate_point,get_3d_point_cam1_2_from_coordinates, triangulate_points_to_obj
 
 data=[
         {#P1_0
@@ -188,7 +189,7 @@ def compute_results(data):
         writer.writeheader()
         writer.writerows(csv_data)
 
-compute_results(data)
+#compute_results(data)
 
 def compute_sensitivity(image_width, image_height, optimized_params,pixel_width,file_name):
     print("compute_sensitivity")
@@ -218,7 +219,88 @@ def compute_sensitivity(image_width, image_height, optimized_params,pixel_width,
         writer.writeheader()
         writer.writerows(csv_data)
 
+def create_3D_mesh(id,inlier_threshold=0.001):
+    print(f"create_3D_mesh {id}")
+    file_name = id
+    photo, angle = file_name.split("_")
+    img_folder = os.path.join(os.getcwd(), 'Photos', 'P'+str(photo))
+    left_image_path = 'D_P'+str(photo)+'_CAM_G_'+str(angle)+'_EAC.png'
+    right_image_path = 'D_P'+str(photo)+'_CAM_D_'+str(angle)+'_EAC.png'
+    left_image_path = os.path.join(img_folder, left_image_path)
+    right_image_path = os.path.join(img_folder, right_image_path)
+    left_image = cv.imread(os.path.join(img_folder, left_image_path))
+    right_image = cv.imread(os.path.join(img_folder, right_image_path))
+    if not os.path.exists(file_name+".csv"):
+        print(f"calibrating {photo}_{angle}")
+        best_results = calibrate_left_right(left_image, right_image, initial_params, bnds,inlier_threshold)
+        optimized_params = best_results["params"]
+    else :
+        optimized_params = load_calibration_params(file_name)
 
+    optimized_R = rotation_matrix_from_params(optimized_params[:3])
+    optimized_t = optimized_params[3:]
+    kpts1, desc1 = detectAndCompute(left_image)
+    kpts2, desc2 = detectAndCompute(right_image)
+    #kpts to uv
+    print(kpts1[0].pt)
+    uv1 = [[k.pt[0], k.pt[1]] for k in kpts1]
+    uv2 = [[k.pt[0], k.pt[1]] for k in kpts2]
+    nn_matches = getMatches(desc1, desc2)
+    matched1 = []
+    matched2 = []
+    nn_match_ratio = 1.0 # Nearest neighbor matching ratio
+    good_matches = [[0, 0] for i in range(len(nn_matches))] 
+    points=[]
+    uvs=[]
+    for i, (m, n) in enumerate(nn_matches):
+        if m.distance < nn_match_ratio * n.distance:
+            p1,p2,residual_distance_normalized = get_3d_point_cam1_2_from_coordinates(uv1[m.queryIdx], uv2[m.trainIdx], image_width, image_height, optimized_R, optimized_t, False)
+            if residual_distance_normalized<0.02 :
+                matched1.append(uv1[m.queryIdx])
+                matched2.append(uv2[m.trainIdx])
+                good_matches[i] = [1, 0] 
+                points.append(p1)
+                p2d = uv1[m.queryIdx]
+                left_image = cv.circle(left_image, (int(p2d[0]), int(p2d[1])), 3, (0, 0, 255), -1)
+                uvs.append([p2d,[p1[0],p1[1],p1[2]]])
+
+    csv_data = [
+        {
+            "u": row[0][0], 
+            "v": row[0][1], 
+            "x": row[1][0], 
+            "y": row[1][1], 
+            "z": row[1][2]
+        } 
+        for row in uvs
+    ]
+
+    # Define CSV file name
+    csv_file = 'data_points.csv'
+
+    # Write to CSV file
+    with open(csv_file, mode='w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=["u", "v", "x", "y", "z"])
+        writer.writeheader()
+        writer.writerows(csv_data)
+
+    cv.imwrite('left_image.jpg', left_image)
+
+    Matched = cv.drawMatchesKnn(left_image, 
+                            kpts1, 
+                            right_image, 
+                            kpts2, 
+                            nn_matches, 
+                            outImg=None, 
+                            matchColor=(0, 155, 0), 
+                            singlePointColor=(0, 255, 255), 
+                            matchesMask=good_matches, 
+                            flags=0
+                            ) 
+    cv.imwrite('triangulate.jpg', Matched)
+    triangulate_points_to_obj(points)
+
+create_3D_mesh("5_2")
 '''
 params=[0.,0.,0.,1.12,0.,0.]
 compute_sensitivity(image_width, image_height,params,200, "sensitivity_1_12")
