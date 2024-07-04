@@ -1,0 +1,405 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FastAPI",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/v1/triangulation/calibrate": {
+      "post": {
+        "tags": [
+          "triangulation"
+        ],
+        "summary": "Auto Calibrate Route",
+        "operationId": "auto_calibrate_route_v1_triangulation_calibrate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoCalibrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array",
+                  "maxItems": 6,
+                  "minItems": 6,
+                  "title": "Response Auto Calibrate Route V1 Triangulation Calibrate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/triangulation/triangulate": {
+      "post": {
+        "tags": [
+          "triangulation"
+        ],
+        "summary": "Triangulate Route",
+        "operationId": "triangulate_route_v1_triangulation_triangulate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriangulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriangulationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/segmentation/": {
+      "post": {
+        "tags": [
+          "segmentation"
+        ],
+        "summary": "Router Autocalibrate Eac Path",
+        "operationId": "router_autocalibrate_EAC_path_v1_segmentation__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AutoCalibrationRequest": {
+        "properties": {
+          "imgLeft_name": {
+            "type": "string",
+            "title": "Imgleft Name",
+            "example": "D_P5_CAM_G_2_EAC.png"
+          },
+          "imgRight_name": {
+            "type": "string",
+            "title": "Imgright Name",
+            "example": "D_P5_CAM_D_2_EAC.png"
+          },
+          "initial_params": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Initial Params",
+            "example": [
+              0,
+              0,
+              0,
+              1.12,
+              0,
+              0
+            ]
+          },
+          "bnds": {
+            "items": {
+              "items": {},
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Bnds",
+            "example": [
+              [
+                -0.17453292519943295,
+                0.17453292519943295
+              ],
+              [
+                -0.17453292519943295,
+                0.17453292519943295
+              ],
+              [
+                -0.17453292519943295,
+                0.17453292519943295
+              ],
+              [
+                1.11,
+                1.13
+              ],
+              [
+                -0.12001,
+                0.12001
+              ],
+              [
+                -0.12001,
+                0.12001
+              ]
+            ]
+          },
+          "inlier_threshold": {
+            "type": "number",
+            "title": "Inlier Threshold",
+            "example": 0.01
+          }
+        },
+        "type": "object",
+        "required": [
+          "imgLeft_name",
+          "imgRight_name",
+          "initial_params",
+          "bnds",
+          "inlier_threshold"
+        ],
+        "title": "AutoCalibrationRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "SegmentationRequest": {
+        "properties": {
+          "image_name": {
+            "type": "string",
+            "title": "Image Name",
+            "description": "Name of the image to segment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_name"
+        ],
+        "title": "SegmentationRequest"
+      },
+      "SegmentationResponse": {
+        "properties": {
+          "segmentedImage": {
+            "type": "string",
+            "title": "Segmentedimage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segmentedImage"
+        ],
+        "title": "SegmentationResponse"
+      },
+      "TriangulationRequest": {
+        "properties": {
+          "keypoints_cam1": {
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Keypoints Cam1",
+            "example": [
+              0,
+              0
+            ]
+          },
+          "keypoints_cam2": {
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Keypoints Cam2",
+            "example": [
+              0,
+              0
+            ]
+          },
+          "image_width": {
+            "type": "integer",
+            "title": "Image Width",
+            "example": 1280
+          },
+          "image_height": {
+            "type": "integer",
+            "title": "Image Height",
+            "example": 1280
+          },
+          "R": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "R",
+            "example": [
+              0,
+              0,
+              0
+            ]
+          },
+          "t": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "T",
+            "example": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "keypoints_cam1",
+          "keypoints_cam2",
+          "image_width",
+          "image_height",
+          "R",
+          "t"
+        ],
+        "title": "TriangulationRequest"
+      },
+      "TriangulationResponse": {
+        "properties": {
+          "pointCam1": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Pointcam1"
+          },
+          "pointCam2": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Pointcam2"
+          },
+          "residuals": {
+            "type": "number",
+            "title": "Residuals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pointCam1",
+          "pointCam2",
+          "residuals"
+        ],
+        "title": "TriangulationResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
