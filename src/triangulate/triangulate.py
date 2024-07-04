@@ -2,8 +2,8 @@ import os
 import numpy as np
 import cv2 as cv
 from scipy.spatial.transform import Rotation as SciPyRotation
-import scipy.spatial
-import trimesh
+#import scipy.spatial
+#import trimesh
 
 
 def rotation_matrix_from_params(params):
@@ -23,7 +23,7 @@ def spherical_to_cartesian(theta, phi):
     z = np.cos(phi) * np.cos(theta)
     return np.array([x, y, z])
 
-def triangulate_point(ray1, ray2, t, R_matrix, verbose=False):
+def triangulate_from_rays(ray1, ray2, t, R_matrix, verbose=False):
     """Triangulate a 3D point from two rays and the relative camera transformation."""
     # Create the matrix A for the linear system
     A = np.zeros((3, 3))
@@ -53,18 +53,19 @@ def triangulate_point(ray1, ray2, t, R_matrix, verbose=False):
     return point_3d_1,lambda2 * ray2,residual_distance_normalized
 
 def get_3d_point_cam1_2_from_coordinates(keypoints_cam1, keypoints_cam2,image_width, image_height,R, t, verbose=False):
+    if verbose:
+        print("get_3d_point_cam1_2_from_coordinates")
+        print("R", R)
     point_image1 = np.array(keypoints_cam1) 
     point_image2 = np.array(keypoints_cam2) 
+    if verbose:
+        print(point_image2,point_image2)
     theta1, phi1 = pixel_to_spherical_revised(image_width, image_height, point_image1[0], point_image1[1])
     theta2, phi2 = pixel_to_spherical_revised(image_width, image_height, point_image2[0], point_image2[1])
+    if verbose:
+        print(theta1,theta2)
     ray1 = spherical_to_cartesian(theta1, phi1)
     ray2 = spherical_to_cartesian(theta2, phi2)
-    point_3d_cam1,point_3d_cam2,residual_distance_normalized = triangulate_point(ray1, ray2, t, R, verbose)
+    point_3d_cam1,point_3d_cam2,residual_distance_normalized = triangulate_from_rays(ray1, ray2, t, R, verbose)
     return point_3d_cam1,point_3d_cam2,residual_distance_normalized
 
-def triangulate_points_to_obj(points):
-    delaunay = scipy.spatial.Delaunay(points)
-    # Create the mesh using the vertices and faces from the triangulation
-    mesh = trimesh.Trimesh(vertices=points, faces=delaunay.simplices,use_embree=True)
-    # Export the mesh to an OBJ file
-    mesh.export('output_mesh.obj')

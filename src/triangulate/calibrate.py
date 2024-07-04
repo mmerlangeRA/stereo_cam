@@ -2,8 +2,8 @@ import os
 import numpy as np
 import cv2 as cv
 import yaml
-from src.triangulate import get_3d_point_cam1_2_from_coordinates, rotation_matrix_from_params
-from src.features import detectAndCompute, getMatches
+from src.triangulate.triangulate import get_3d_point_cam1_2_from_coordinates, rotation_matrix_from_params
+from src.triangulate.features import detectAndCompute, getMatches
 from scipy.optimize import minimize
 from random import randrange,sample
 
