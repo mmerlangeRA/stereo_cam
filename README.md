@@ -35,6 +35,23 @@ Chaque fois :
 source venv/bin/activate
 ```
 
+## Utilisation scripts
+
+Autocalibration
+
+```bash
+python triangulate.py auto_calibrate --imgLeft_name "Photos/P1/D_P1_CAM_G_0_EAC.png" --imgRight_name "Photos/P1/D_P1_CAM_D_0_EAC.png" --initial_params "[0, 0, 0, 1.12, 0, 0]" --bnds "[[-0.17, 0.17], [-0.17, 0.17], [-0.17, 0.17], [1.11, 1.13], [-0.12001, 0.12001], [-0.12001, 0.12001]]" --inlier_threshold 0.01 
+```
+
+Triangulation
+R et t sont les 3 premiers/derniers paramètres retournés par auto_calibrate
+
+```bash
+python triangulate.py triangulatePoints --keypoints_cam1 "[100.0, 200.0]" --keypoints_cam2 "[150.0, 250.0]" --image_width 5376 --image_height 2388 --R "[0.0, 0.0, 0.]" --t "[1.12, 0., 0.]"
+
+```
+
+
 ## Lancement du serveur sur le port 8001
 
 ```bash
@@ -58,7 +75,7 @@ python -m python_server.scripts.extract_openapi python_server.main:app --out pyt
 
 ## Docker installation
 
-docker-compose up -d
+to be done
 
 
 # Ressources :

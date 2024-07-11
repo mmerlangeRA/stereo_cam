@@ -1,70 +1,59 @@
-import os
-import numpy as np
-import cv2 as cv
-
-from src.calibrate import get_cube_subs, read_calibration, undistort
-
-img_folder = os.path.join(os.getcwd(), 'Photos')
-img_folder= os.path.join(img_folder, 'P1')
-left_image_path = 'D_P1_CAM_G_2_EAC.png'
-right_image_path = 'D_P1_CAM_D_2_EAC.png'
-
-is_Cube= False
-config_index= 2
-left_image = cv.imread(os.path.join(img_folder,left_image_path))
-right_image = cv.imread(os.path.join(img_folder,right_image_path))
-if is_Cube:
-    left_image = get_cube_subs(left_image)[config_index]
-    right_image = get_cube_subs(right_image)[config_index]
-else:
-    sub_left = left_image
-    sub_right = right_image
-
-left_pos = [1208, 622]
-right_pos = [1192, 606]
-
-cv.imwrite("left.png",sub_left)
-cv.imwrite("right.png",sub_right)
-
-calibration_path="calibration_matrix_eac.yaml"
-
-mtx, dist,rmse = read_calibration(calibration_path)
-undistorted_left = undistort(sub_left, mtx, dist)
-undistorted_right = undistort(sub_right, mtx, dist)
-cv.imwrite("undistorted_left.png",undistorted_left)
-cv.imwrite("undistorted_right.png",undistorted_right)
-
-# Intrinsic parameters of Camera 1
-K1 = np.asarray(mtx)
-
-# Intrinsic parameters of Camera 2
-K2 = np.asarray(mtx)
-
-# Rotation and translation from Camera 1 to Camera 2
-R = np.identity(3)
-T = np.array([0,0,1.12])  # 3x1 translation vector
-
-# Projection matrices
-P1 = K1 @ np.hstack((np.eye(3), np.zeros((3, 1))))  # Camera 1 projection matrix [K1 | 0]
-P2 = K2 @ np.hstack((R, T.reshape(-1, 1)))          # Camera 2 projection matrix [K2 | RT]
-
-# Keypoints in the images
-p1 = np.array(left_pos)  # Keypoint in image from Camera 1
-p2 = np.array(right_pos)  # Keypoint in image from Camera 2
-
-# Convert keypoints to homogeneous coordinates
-p1_h = np.append(p1, 1)
-p2_h = np.append(p2, 1)
-
-# Triangulate the 3D point
-points_4d_hom = cv.triangulatePoints(P1, P2, p1_h[:2].reshape(2, 1), p2_h[:2].reshape(2, 1))
-
-# Convert from homogeneous coordinates to 3D
-points_3d = points_4d_hom[:3] / points_4d_hom[3]
-
-distance = np.linalg.norm(points_3d)
+import argparse
+import json
+from python_server.components.triangulation.main import AutoCalibrationRequest, TriangulationRequest, auto_calibrate, triangulatePoints
 
 
-print("3D position of the keypoint:", points_3d.flatten())
+def main():
+    parser = argparse.ArgumentParser(description="Process some images.")
+    subparsers = parser.add_subparsers(dest="command")
 
-print(f'distance is {distance}')
+    # Subparser for auto_calibrate
+    calibrate_parser = subparsers.add_parser('auto_calibrate')
+    calibrate_parser.add_argument('--imgLeft_name', type=str, required=True, help='Name of the left image')
+    calibrate_parser.add_argument('--imgRight_name', type=str, required=True, help='Name of the right image')
+    calibrate_parser.add_argument('--initial_params', type=json.loads, required=True, help='Initial parameters as a JSON list')
+    calibrate_parser.add_argument('--bnds', type=json.loads, required=True, help='Bounds as a JSON list of tuples')
+    calibrate_parser.add_argument('--inlier_threshold', type=float, required=False, help='Inlier threshold')
+    calibrate_parser.add_argument('--verbose', type=bool, required=False, help='verbose mode')
+
+    # Subparser for triangulatePoints
+    triangulate_parser = subparsers.add_parser('triangulatePoints')
+    triangulate_parser.add_argument('--keypoints_cam1', type=json.loads, required=True, help='Keypoints from camera 1 as a JSON tuple')
+    triangulate_parser.add_argument('--keypoints_cam2', type=json.loads, required=True, help='Keypoints from camera 2 as a JSON tuple')
+    triangulate_parser.add_argument('--image_width', type=int, required=True, help='Width of the image')
+    triangulate_parser.add_argument('--image_height', type=int, required=True, help='Height of the image')
+    triangulate_parser.add_argument('--R', type=json.loads, required=True, help='Rotation matrix parameters x,y,z as a JSON list')
+    triangulate_parser.add_argument('--t', type=json.loads, required=True, help='Translation vector x,y,z as a JSON list')
+    triangulate_parser.add_argument('--verbose', type=bool, required=False, help='verbose mode')
+
+    args = parser.parse_args()
+
+    if args.command == "auto_calibrate":
+        request = AutoCalibrationRequest(
+            imgLeft_name=args.imgLeft_name,
+            imgRight_name=args.imgRight_name,
+            initial_params=args.initial_params,
+            bnds=args.bnds,
+            inlier_threshold=args.inlier_threshold
+        )
+        result = auto_calibrate(request)
+        print(f"Optimized Parameters: {result}")
+
+    elif args.command == "triangulatePoints":
+        request = TriangulationRequest(
+            keypoints_cam1=tuple(args.keypoints_cam1),
+            keypoints_cam2=tuple(args.keypoints_cam2),
+            image_width=args.image_width,
+            image_height=args.image_height,
+            R=args.R,
+            t=args.t,
+            verbose=args.verbose
+        )
+        point1, point2, residual = triangulatePoints(request)
+        print(f"3D Point Camera 1: {point1}")
+        print(f"3D Point Camera 2: {point2}")
+        print(f"Residual: {residual}")
+
+
+if __name__ == "__main__":
+    main()

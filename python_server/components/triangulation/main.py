@@ -11,7 +11,6 @@ from src.triangulate.triangulate import rotation_matrix_from_params, triangulate
 from pydantic import BaseModel, Field
 from python_server.settings.settings import settings
 
-
 class TriangulationRequest(BaseModel):
     keypoints_cam1: Tuple[float, float] = Field(..., example=(0, 0))
     keypoints_cam2: Tuple[float, float] = Field(..., example=(0, 0))
@@ -33,29 +32,29 @@ class AutoCalibrationRequest(BaseModel):
     class Config:
         from_attributes = True
 
-def auto_calibrate(request:AutoCalibrationRequest)->List[float]:
-    img1_path = get_photos_path(request.imgLeft_name)
-    img2_path = get_photos_path(request.imgRight_name)
+def auto_calibrate(request:AutoCalibrationRequest, verbose=False)->List[float]:
+    imgLeft_path = request.imgLeft_name if "/" in request.imgLeft_name else get_photos_path(request.imgLeft_name)
+    imgRight_path = request.imgRight_name if "/" in request.imgRight_name else get_photos_path(request.imgRight_name)
+
     try:
-        left_image = cv.imread(img1_path)
+        left_image = cv.imread(imgLeft_path)
     except Exception as e:
         raise FileNotFoundError(f"left_image not found {e}")
     try:
-        right_image = cv.imread(img2_path)
+        right_image = cv.imread(imgRight_path)
     except Exception as e:
         raise FileNotFoundError(f"right_image not found{e}")
 
-    best_results = calibrate_left_right(left_image, right_image, request.initial_params, request.bnds,request.inlier_threshold)
+    best_results = calibrate_left_right(left_image, right_image, request.initial_params, request.bnds,request.inlier_threshold,verbose=verbose)
     optimized_params = best_results["params"]
     if isinstance(optimized_params, np.ndarray):
         optimized_params = optimized_params.tolist()
     
     return optimized_params
 
-
-def triangulatePoints(request:TriangulationRequest)-> Tuple[List[float], List[float], float]:
+def triangulatePoints(request:TriangulationRequest, verbose=False)-> Tuple[List[float], List[float], float]:
     rot_matrix = rotation_matrix_from_params(request.R)
-    point1,point2,residual = get_3d_point_cam1_2_from_coordinates(request.keypoints_cam1, request.keypoints_cam2, request.image_width, request.image_height, rot_matrix, request.t, True)
+    point1,point2,residual = get_3d_point_cam1_2_from_coordinates(request.keypoints_cam1, request.keypoints_cam2, request.image_width, request.image_height, rot_matrix, request.t, verbose)
     if type(point1) is np.ndarray:
         point1 = point1.tolist()
     if type(point2) is np.ndarray:
