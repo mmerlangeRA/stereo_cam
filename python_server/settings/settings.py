@@ -1,5 +1,4 @@
 from pydantic import BaseModel, Field
-
 from python_server.settings.settings_loader import load_active_settings
 
 
@@ -61,7 +60,7 @@ class ServerSettings(BaseModel):
     env_name: str = Field(
         description="Name of the environment (prod, staging, local...)"
     )
-    port: int = Field(description="Port of PrivateGPT FastAPI server, defaults to 8001")
+    port: int = Field(description="Port of FastAPI server, defaults to 8001")
     cors: CorsSettings = Field(
         description="CORS configuration", default=CorsSettings(enabled=False)
     )
@@ -74,10 +73,15 @@ class Token(BaseModel):
 class DatabaseSettings(BaseModel):
     name: str
 
+class DataPathSettings(BaseModel):
+    photo_data_folder: str = Field(description="Path to Photo folder")
+    processed_data_folder: str = Field(description="Path to Processed folder")
+
 class Settings(BaseModel):
     server: ServerSettings
     token: Token
     database: DatabaseSettings
+    data: DataPathSettings
 
 
 

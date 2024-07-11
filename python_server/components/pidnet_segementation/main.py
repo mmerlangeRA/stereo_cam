@@ -12,8 +12,7 @@ from src.PIDNet.models import models
 import torch
 import torch.nn.functional as F
 from PIL import Image
-from python_server.constants import PHOTO_FOLDER_PATH, TMP_FOLDER_PATH
-from src.utils.path_utils import find_image_path
+from src.utils.path_utils import get_photos_path, get_processed_path, get_public_processed_path, get_static_path
 
 root = os.getcwd()
 PIDNetRoot = os.path.join(root, 'src','PIDNet')
@@ -77,16 +76,16 @@ model.eval()
 
 def segment_image(image_name:str):
     global model
-    print("Processing: ", image_name)
-    image_path = find_image_path(PHOTO_FOLDER_PATH, image_name)
-    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    image_path = get_photos_path(image_name)
+    try:
+        img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    except:
+        raise FileNotFoundError("Image not found")
     sv_img = np.zeros_like(img).astype(np.uint8)
     img = input_transform(img)
     img = img.transpose((2, 0, 1)).copy()
     img = torch.from_numpy(img).unsqueeze(0).cuda()
-    print("model eval: ", image_name)
     pred = model(img)
-    print("eval done")
     pred = F.interpolate(pred, size=img.size()[-2:], 
                             mode='bilinear', align_corners=True)
     pred = torch.argmax(pred, dim=1).squeeze(0).cpu().numpy()
@@ -96,12 +95,11 @@ def segment_image(image_name:str):
             sv_img[:,:,j][pred==i] = color_map[i][j]
     sv_img = Image.fromarray(sv_img)
     
-    if not os.path.exists(TMP_FOLDER_PATH):
-        os.makedirs(TMP_FOLDER_PATH)
 
-    tmp_path = os.path.join(TMP_FOLDER_PATH, image_name)
-    sv_img.save(tmp_path)
-    return tmp_path
+    processed_path = get_processed_path(image_name)
+    sv_img.save(processed_path)
+    public_path = get_public_processed_path(image_name)
+    return public_path
 
 def get_image_paths(folder):
     print("folder", folder)

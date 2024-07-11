@@ -4,6 +4,7 @@ Photos
 src/PIDNet/output
 src/PIDNet/samples
 *.png
+static
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

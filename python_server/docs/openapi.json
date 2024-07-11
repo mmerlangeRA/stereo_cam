@@ -98,8 +98,8 @@
         "tags": [
           "segmentation"
         ],
-        "summary": "Router Autocalibrate Eac Path",
-        "operationId": "router_autocalibrate_EAC_path_v1_segmentation__post",
+        "summary": "Segmentate Image",
+        "operationId": "segmentate_image_v1_segmentation__post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -116,8 +116,114 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SegmentationResponse"
+                  "$ref": "#/components/schemas/Processed_file_response"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/photo/": {
+      "post": {
+        "tags": [
+          "photos"
+        ],
+        "summary": "Upload Image",
+        "operationId": "upload_image_v1_photo__post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_image_v1_photo__post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Processed_file_response"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/photo/files": {
+      "get": {
+        "tags": [
+          "photos"
+        ],
+        "summary": "List Files",
+        "operationId": "list_files_v1_photo_files_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Response List Files V1 Photo Files Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/photo/files/{filename}": {
+      "delete": {
+        "tags": [
+          "photos"
+        ],
+        "summary": "Delete File",
+        "operationId": "delete_file_v1_photo_files__filename__delete",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -214,6 +320,20 @@
         ],
         "title": "AutoCalibrationRequest"
       },
+      "Body_upload_image_v1_photo__post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_image_v1_photo__post"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -226,6 +346,19 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "Processed_file_response": {
+        "properties": {
+          "public": {
+            "type": "string",
+            "title": "Public"
+          }
+        },
+        "type": "object",
+        "required": [
+          "public"
+        ],
+        "title": "Processed_file_response"
       },
       "SegmentationRequest": {
         "properties": {
@@ -240,19 +373,6 @@
           "image_name"
         ],
         "title": "SegmentationRequest"
-      },
-      "SegmentationResponse": {
-        "properties": {
-          "segmentedImage": {
-            "type": "string",
-            "title": "Segmentedimage"
-          }
-        },
-        "type": "object",
-        "required": [
-          "segmentedImage"
-        ],
-        "title": "SegmentationResponse"
       },
       "TriangulationRequest": {
         "properties": {

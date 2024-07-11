@@ -8,6 +8,7 @@ from injector import Injector
 from python_server.components.triangulation.database.main import init_db
 from python_server.routes.segmentation.segmentation_router import segmentation_router 
 from python_server.routes.triangulation.triangulation_router import triangulation_router 
+from python_server.routes.photo_router.photo_router import photo_router 
 
 from python_server.settings.settings import Settings
 from fastapi.staticfiles import StaticFiles
@@ -23,7 +24,6 @@ async def lifespan(app: FastAPI):
     yield
 
 def create_app(root_injector: Injector) -> FastAPI:
-    
     # Start the API
     async def bind_injector_to_request(request: Request) -> None:
         request.state.injector = root_injector
@@ -35,6 +35,7 @@ def create_app(root_injector: Injector) -> FastAPI:
     app.mount("/static", StaticFiles(directory="static"), name="static")
     app.include_router(triangulation_router)
     app.include_router(segmentation_router)
+    app.include_router(photo_router)
     settings = root_injector.get(Settings)
 
     if settings.server.cors.enabled:

@@ -4,11 +4,12 @@ from typing import List, Tuple
 import numpy as np
 import cv2 as cv
 from scipy.optimize import minimize
-from src.utils.path_utils import find_image_path
+from src.utils.path_utils import find_image_path, get_photos_path
 from src.triangulate.features import detectAndCompute, getMatches
 from src.triangulate.calibrate import calibrate_left_right, getCalibrationFrom3Matching, load_calibration_params, save_calibration_params
 from src.triangulate.triangulate import rotation_matrix_from_params, triangulate_from_rays,get_3d_point_cam1_2_from_coordinates
 from pydantic import BaseModel, Field
+from python_server.settings.settings import settings
 
 
 class TriangulationRequest(BaseModel):
@@ -33,13 +34,17 @@ class AutoCalibrationRequest(BaseModel):
         from_attributes = True
 
 def auto_calibrate(request:AutoCalibrationRequest)->List[float]:
-    photo_folder = os.path.join(os.getcwd(), 'Photos')
-    img1_path = find_image_path(photo_folder, request.imgLeft_name)
-    img2_path = find_image_path(photo_folder, request.imgRight_name)
-    if img1_path is None or img2_path is None:
-        raise ValueError("Image not found")
-    left_image = cv.imread(img1_path)
-    right_image = cv.imread(img2_path)
+    img1_path = get_photos_path(request.imgLeft_name)
+    img2_path = get_photos_path(request.imgRight_name)
+    try:
+        left_image = cv.imread(img1_path)
+    except Exception as e:
+        raise FileNotFoundError(f"left_image not found {e}")
+    try:
+        right_image = cv.imread(img2_path)
+    except Exception as e:
+        raise FileNotFoundError(f"right_image not found{e}")
+
     best_results = calibrate_left_right(left_image, right_image, request.initial_params, request.bnds,request.inlier_threshold)
     optimized_params = best_results["params"]
     if isinstance(optimized_params, np.ndarray):
