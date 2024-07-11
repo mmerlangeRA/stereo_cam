@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.types import TypeDecorator, TEXT
 from sqlalchemy import func
-from python_server.components.triangulation.database.base import Base
+from python_server.components.triangulation_equipolar.database.base import Base
 
 class JsonType(TypeDecorator):
     impl = TEXT

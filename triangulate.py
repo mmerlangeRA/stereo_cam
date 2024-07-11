@@ -1,6 +1,6 @@
 import argparse
 import json
-from python_server.components.triangulation.main import AutoCalibrationRequest, TriangulationRequest, auto_calibrate, triangulatePoints
+from python_server.components.triangulation_equipolar.main import AutoCalibrationRequest, TriangulationRequest, auto_calibrate_equipoloar, triangulate_equipolar_points
 
 
 def main():
@@ -36,7 +36,7 @@ def main():
             bnds=args.bnds,
             inlier_threshold=args.inlier_threshold
         )
-        result = auto_calibrate(request)
+        result = auto_calibrate_equipoloar(request)
         print(f"Optimized Parameters: {result}")
 
     elif args.command == "triangulatePoints":
@@ -49,7 +49,7 @@ def main():
             t=args.t,
             verbose=args.verbose
         )
-        point1, point2, residual = triangulatePoints(request)
+        point1, point2, residual = triangulate_equipolar_points(request)
         print(f"3D Point Camera 1: {point1}")
         print(f"3D Point Camera 2: {point2}")
         print(f"Residual: {residual}")

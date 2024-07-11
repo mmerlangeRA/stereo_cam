@@ -32,7 +32,7 @@ class AutoCalibrationRequest(BaseModel):
     class Config:
         from_attributes = True
 
-def auto_calibrate(request:AutoCalibrationRequest, verbose=False)->List[float]:
+def auto_calibrate_equipoloar(request:AutoCalibrationRequest, verbose=False)->List[float]:
     imgLeft_path = request.imgLeft_name if "/" in request.imgLeft_name else get_photos_path(request.imgLeft_name)
     imgRight_path = request.imgRight_name if "/" in request.imgRight_name else get_photos_path(request.imgRight_name)
 
@@ -52,7 +52,7 @@ def auto_calibrate(request:AutoCalibrationRequest, verbose=False)->List[float]:
     
     return optimized_params
 
-def triangulatePoints(request:TriangulationRequest, verbose=False)-> Tuple[List[float], List[float], float]:
+def triangulate_equipolar_points(request:TriangulationRequest, verbose=False)-> Tuple[List[float], List[float], float]:
     rot_matrix = rotation_matrix_from_params(request.R)
     point1,point2,residual = get_3d_point_cam1_2_from_coordinates(request.keypoints_cam1, request.keypoints_cam2, request.image_width, request.image_height, rot_matrix, request.t, verbose)
     if type(point1) is np.ndarray:

@@ -2,8 +2,8 @@ from typing import Generator
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from python_server.settings.settings import settings
-from python_server.components.triangulation.database.base import Base
-from python_server.components.triangulation.database.uv_xyz import UV_XYZ 
+from python_server.components.triangulation_equipolar.database.base import Base
+from python_server.components.triangulation_equipolar.database.uv_xyz import UV_XYZ 
 
 
 dbName = settings().database.name

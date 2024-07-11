@@ -47,7 +47,7 @@ Triangulation
 R et t sont les 3 premiers/derniers paramètres retournés par auto_calibrate
 
 ```bash
-python triangulate.py triangulatePoints --keypoints_cam1 "[100.0, 200.0]" --keypoints_cam2 "[150.0, 250.0]" --image_width 5376 --image_height 2388 --R "[0.0, 0.0, 0.]" --t "[1.12, 0., 0.]"
+python triangulate.py triangulatePoints --keypoints_cam1 "[100.0, 200.0]" --keypoints_cam2 "[150.0, 250.0]" --image_width 5376 --image_height 2388 --R "[0.0, 0.0, 0.0]" --t "[1.12, 0.0, 0.0]"
 
 ```
 

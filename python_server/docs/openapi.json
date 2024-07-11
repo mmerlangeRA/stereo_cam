@@ -8,7 +8,7 @@
     "/v1/triangulation/calibrate": {
       "post": {
         "tags": [
-          "triangulation"
+          "equiolar triangulation"
         ],
         "summary": "Auto Calibrate Route",
         "operationId": "auto_calibrate_route_v1_triangulation_calibrate_post",
@@ -55,7 +55,7 @@
     "/v1/triangulation/triangulate": {
       "post": {
         "tags": [
-          "triangulation"
+          "equiolar triangulation"
         ],
         "summary": "Triangulate Route",
         "operationId": "triangulate_route_v1_triangulation_triangulate_post",
