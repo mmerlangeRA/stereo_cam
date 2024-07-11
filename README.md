@@ -56,6 +56,10 @@ python triangulate.py triangulatePoints --keypoints_cam1 "[100.0, 200.0]" --keyp
 
 Test simple pour régénérer <https://docs.google.com/spreadsheets/d/1hidqo7HglxUd2cEmL3stfshqK71vDYl6QxuA9wgwzOo/edit?usp=sharing>:
 
+Il est supposé que toutes les photos sont dans le dossier Photos, à la racine.
+
+J'ai utilisé une copie de <https://drive.google.com/drive/folders/1DFFxjpu4VPXhJ9-PGA0izL2VoJxEwOxL?usp=sharing>
+
 ```bash
 python triangulate_test.py
 
