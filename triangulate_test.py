@@ -2,11 +2,12 @@ import csv
 import os
 import numpy as np
 import cv2 as cv
-from scipy.optimize import minimize
-from src.features import detectAndCompute, getMatches
-from src.calibrate import calibrate_left_right, getCalibrationFrom3Matching, load_calibration_params, save_calibration_params
-from src.triangulate import rotation_matrix_from_params, triangulate_point,get_3d_point_cam1_2_from_coordinates, triangulate_points_to_obj
+from src.triangulate.calibrate import calibrate_left_right,rotation_matrix_from_params,get_3d_point_cam1_2_from_coordinates
+from src.utils.path_utils import save_calibration_params,load_calibration_params
 
+#Data for estimating
+#keypoints_top : coordinates in camLeft and camRight of a "top" point on the sign
+#keypoints_bottom : coordinates in camLeft and camRight of a "bottom" point on the sign
 data=[
         {#P1_0
             "id":"1_0",
@@ -109,14 +110,6 @@ data=[
             "valid":True
         }
     ]
-# Main execution
-# Image dimensions
-img_folder = os.path.join(os.getcwd(), 'Photos', 'P1')
-left_image_path = 'D_P1_CAM_G_1_EAC.png'
-right_image_path = 'D_P1_CAM_D_1_EAC.png'
-left_image = cv.imread(os.path.join(img_folder, left_image_path))
-right_image = cv.imread(os.path.join(img_folder, right_image_path))
-image_height,image_width = left_image.shape[:2]
 
 #initial params and bounds
 angle_max = np.pi*10./180.
@@ -134,7 +127,7 @@ def generate_all_calibrations(initial_params,bnds,inlier_threshold,id):
             right_image_path = 'D_P'+str(photo)+'_CAM_D_'+str(angle)+'_EAC.png'
             left_image_path = os.path.join(img_folder, left_image_path)
             right_image_path = os.path.join(img_folder, right_image_path)
-            if os.path.exists(left_image_path):
+            if os.path.exists(left_image_path) and os.path.exists(right_image_path):
                 print(f"calibrating {photo}_{angle}")
                 left_image = cv.imread(os.path.join(img_folder, left_image_path))
                 right_image = cv.imread(os.path.join(img_folder, right_image_path))
@@ -142,9 +135,9 @@ def generate_all_calibrations(initial_params,bnds,inlier_threshold,id):
                 optimized_params = best_results["params"]
                 array_calibration[str(photo)+"_"+str(angle)]=optimized_params
                 save_calibration_params(optimized_params, str(photo)+"_"+str(angle))
-    print(array_calibration)
+
     csv_data = [{"id": key, "rotx": value[0], "roty": value[1], "rotz": value[2], "tx": value[3], "ty": value[4], "tz": value[5]} for key, value in array_calibration.items()]
-    # Define CSV file name
+    # Define CSV file name to save  all calibrations
     csv_file = f'calibrations{id}.csv'
     # Write to CSV file
     with open(csv_file, mode='w', newline='') as file:
@@ -152,7 +145,7 @@ def generate_all_calibrations(initial_params,bnds,inlier_threshold,id):
         writer.writeheader()
         writer.writerows(csv_data)
 
-#generate_all_calibrations(initial_params,bnds,0.001,"01")                                                             
+generate_all_calibrations(initial_params,bnds,0.001,"01")                                                             
 
 def compute_results(data):
     array_result={}
@@ -165,10 +158,10 @@ def compute_results(data):
         optimized_params = load_calibration_params(file_name)
         optimized_R = rotation_matrix_from_params(optimized_params[:3])
         optimized_t = optimized_params[3:]
+        image_width = d["image_width"]
+        image_height = d["image_height"]
         p1_top,p2_top,residual_distance_normalized = get_3d_point_cam1_2_from_coordinates(d["keypoints_top"][0], d["keypoints_top"][1], image_width, image_height, optimized_R, optimized_t, False)
-        #print(p1_top,p2_top,residual_distance_normalized)
         p1_bottom,p2_bottom,residual_distance_normalized = get_3d_point_cam1_2_from_coordinates(d["keypoints_bottom"][0], d["keypoints_bottom"][1], image_width, image_height, optimized_R, optimized_t)
-        #print(p1_bottom,p2_bottom,residual_distance_normalized)
         panneau_size_1 = np.linalg.norm(p1_top-p1_bottom)
         panneau_size_2 = np.linalg.norm(p2_top-p2_bottom)
         panneau_size=(panneau_size_1+panneau_size_2)/2
@@ -189,124 +182,8 @@ def compute_results(data):
         writer.writeheader()
         writer.writerows(csv_data)
 
-#compute_results(data)
+compute_results(data)
 
-def compute_sensitivity(image_width, image_height, optimized_params,pixel_width,file_name):
-    print("compute_sensitivity")
-    print("optimized_params",optimized_params)
-    optimized_R = rotation_matrix_from_params(optimized_params[:3])
-    optimized_t = optimized_params[3:]
-    half = int(pixel_width/2)
-    
-    results={}
-    for i in range(pixel_width,image_width-pixel_width):
-        h= int(image_height/2)
-        p1_ref,p2_ref,residual_distance_normalized = get_3d_point_cam1_2_from_coordinates([i-half, h],[i+half, h], image_width, image_height, optimized_R, optimized_t, False)
-        p1_per,p2_per,residual_distance_normalized = get_3d_point_cam1_2_from_coordinates([i-half+1, h], [i+half, h],image_width, image_height, optimized_R, optimized_t, False)
-        change_i = np.linalg.norm(p1_per-p1_ref)
-        optimized_params_per = optimized_params.copy()
-        optimized_params_per[0] += 1./180.*np.pi
-        optimized_R_per =rotation_matrix_from_params(optimized_params_per[:3])
-        p1_per,p2_per,residual_distance_normalized = get_3d_point_cam1_2_from_coordinates([i-half, h],[i+half, h], image_width, image_height, optimized_R_per, optimized_t, False)
-        change_r = np.linalg.norm(p1_per-p1_ref)
-        distance_cam_1=np.linalg.norm(p1_per)
-        distance_cam_2=np.linalg.norm(p2_per)
-        results[i]=[distance_cam_1,distance_cam_2,change_i,change_r]
-    csv_data = [{"i": key, "distance_cam_1": value[0],"distance_cam_2": value[1], "change_i":value[2],"change_r": value[3]} for key, value in results.items()]
-    csv_file = f'{file_name}.csv'
-    with open(csv_file, mode='w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=["i", "distance_cam_1","distance_cam_2","change_i", "change_r"])
-        writer.writeheader()
-        writer.writerows(csv_data)
-
-def create_3D_mesh(id,inlier_threshold=0.001):
-    print(f"create_3D_mesh {id}")
-    file_name = id
-    photo, angle = file_name.split("_")
-    img_folder = os.path.join(os.getcwd(), 'Photos', 'P'+str(photo))
-    left_image_path = 'D_P'+str(photo)+'_CAM_G_'+str(angle)+'_EAC.png'
-    right_image_path = 'D_P'+str(photo)+'_CAM_D_'+str(angle)+'_EAC.png'
-    left_image_path = os.path.join(img_folder, left_image_path)
-    right_image_path = os.path.join(img_folder, right_image_path)
-    left_image = cv.imread(os.path.join(img_folder, left_image_path))
-    right_image = cv.imread(os.path.join(img_folder, right_image_path))
-    if not os.path.exists(file_name+".csv"):
-        print(f"calibrating {photo}_{angle}")
-        best_results = calibrate_left_right(left_image, right_image, initial_params, bnds,inlier_threshold)
-        optimized_params = best_results["params"]
-    else :
-        optimized_params = load_calibration_params(file_name)
-
-    optimized_R = rotation_matrix_from_params(optimized_params[:3])
-    optimized_t = optimized_params[3:]
-    kpts1, desc1 = detectAndCompute(left_image)
-    kpts2, desc2 = detectAndCompute(right_image)
-    #kpts to uv
-    print(kpts1[0].pt)
-    uv1 = [[k.pt[0], k.pt[1]] for k in kpts1]
-    uv2 = [[k.pt[0], k.pt[1]] for k in kpts2]
-    nn_matches = getMatches(desc1, desc2)
-    matched1 = []
-    matched2 = []
-    nn_match_ratio = 1.0 # Nearest neighbor matching ratio
-    good_matches = [[0, 0] for i in range(len(nn_matches))] 
-    points=[]
-    uvs=[]
-    for i, (m, n) in enumerate(nn_matches):
-        if m.distance < nn_match_ratio * n.distance:
-            p1,p2,residual_distance_normalized = get_3d_point_cam1_2_from_coordinates(uv1[m.queryIdx], uv2[m.trainIdx], image_width, image_height, optimized_R, optimized_t, False)
-            if residual_distance_normalized<0.02 :
-                matched1.append(uv1[m.queryIdx])
-                matched2.append(uv2[m.trainIdx])
-                good_matches[i] = [1, 0] 
-                points.append(p1)
-                p2d = uv1[m.queryIdx]
-                left_image = cv.circle(left_image, (int(p2d[0]), int(p2d[1])), 3, (0, 0, 255), -1)
-                uvs.append([p2d,[p1[0],p1[1],p1[2]]])
-
-    csv_data = [
-        {
-            "u": row[0][0], 
-            "v": row[0][1], 
-            "x": row[1][0], 
-            "y": row[1][1], 
-            "z": row[1][2]
-        } 
-        for row in uvs
-    ]
-
-    # Define CSV file name
-    csv_file = 'data_points.csv'
-
-    # Write to CSV file
-    with open(csv_file, mode='w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=["u", "v", "x", "y", "z"])
-        writer.writeheader()
-        writer.writerows(csv_data)
-
-    cv.imwrite('left_image.jpg', left_image)
-
-    Matched = cv.drawMatchesKnn(left_image, 
-                            kpts1, 
-                            right_image, 
-                            kpts2, 
-                            nn_matches, 
-                            outImg=None, 
-                            matchColor=(0, 155, 0), 
-                            singlePointColor=(0, 255, 255), 
-                            matchesMask=good_matches, 
-                            flags=0
-                            ) 
-    cv.imwrite('triangulate.jpg', Matched)
-    triangulate_points_to_obj(points)
-
-create_3D_mesh("5_2")
-'''
-params=[0.,0.,0.,1.12,0.,0.]
-compute_sensitivity(image_width, image_height,params,200, "sensitivity_1_12")
-params=[0.,0.,0.,1.,0.,0.]
-compute_sensitivity(image_width, image_height,params,200, "sensitivity_1")
-'''
 
 
     

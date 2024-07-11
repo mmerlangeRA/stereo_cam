@@ -7,14 +7,6 @@ from src.triangulate.features import detectAndCompute, getMatches
 from scipy.optimize import minimize
 from random import randrange,sample
 
-calibration_folder = "calibration"
-
-def save_calibration_params(params, filename):
-    np.savetxt(filename+'.csv', params, delimiter=',')
-
-def load_calibration_params(filename):
-    loaded =np.loadtxt(filename+'.csv', delimiter=',')
-    return loaded
 
 def computeInliers(R, t, keypoints_cam1, keypoints_cam2, threshold, image_width, image_height):
     inliers = []

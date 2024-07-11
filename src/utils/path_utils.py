@@ -1,4 +1,7 @@
 import os
+from typing import List
+
+import numpy as np
 from python_server.settings.settings import settings
 
 def find_image_path(folder, image_name)->str:
@@ -47,3 +50,21 @@ def get_tmp_static_folder()->str:
     if not os.path.exists(tmp_folder):
         os.makedirs(tmp_folder)
     return tmp_folder
+
+
+def get_calibration_file_path(filename:str)->str:
+    calibration_folder = os.path.join(os.getcwd(), 'calibration')
+    if not os.path.exists(calibration_folder):
+        os.makedirs(calibration_folder)
+    return os.path.join(calibration_folder,filename)
+
+def save_calibration_params(params:List[float], filename:str):
+    filename_csv = filename+'.csv'
+    calib_path =get_calibration_file_path(filename_csv)
+    np.savetxt(calib_path, params, delimiter=',')
+
+def load_calibration_params(filename:str)->List[float]:
+    filename_csv = filename+'.csv'
+    calib_path =get_calibration_file_path(filename_csv)
+    loaded =np.loadtxt(calib_path, delimiter=',')
+    return loaded

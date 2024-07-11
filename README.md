@@ -27,6 +27,9 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+NB : si vous ne voulez pas de serveur et pas de segmentation, minirequirements.txt devrait suffire.
+Attention, il est possible que certains liens avec le serveur doivent être cassés (to be done)
+
 Chaque fois :
 
 * activation de l'environnemnt virtuel
@@ -51,6 +54,13 @@ python triangulate.py triangulatePoints --keypoints_cam1 "[100.0, 200.0]" --keyp
 
 ```
 
+Test simple pour régénérer <https://docs.google.com/spreadsheets/d/1hidqo7HglxUd2cEmL3stfshqK71vDYl6QxuA9wgwzOo/edit?usp=sharing>:
+
+```bash
+python triangulate_test.py
+
+```
+
 
 ## Lancement du serveur sur le port 8001
 
@@ -59,13 +69,9 @@ python -m uvicorn python_server.main:app --reload --host 0.0.0.0 --port 8001
 
 ```
 
-## Bibliothèques tierces
-
-* segmentation : <https://github.com/XuJiacong/PIDNet>
-
 ## Documentation
 
-APIs are fully available at site-url/docs
+APIs disponibles sur site-url/docs
 
 ### Generation des apis
 
@@ -73,13 +79,12 @@ APIs are fully available at site-url/docs
 python -m python_server.scripts.extract_openapi python_server.main:app --out python_server/docs/openapi.json
 ```
 
+## Bibliothèques tierces
+
+* segmentation : <https://github.com/XuJiacong/PIDNet>
+
+Pour que cela fonctionne, il faut ajouter dans src/pretrained_models le dossier cityscapes disponible ici : <https://drive.google.com/drive/folders/1xDwOiH-Z0cOK_F6lvnykVyjry1s2njRS?usp=sharing>
+
 ## Docker installation
 
 to be done
-
-
-# Ressources :
-https://github.com/TemugeB/python_stereo_camera_calibrate
-file:///Users/michaelargi/Downloads/MMSP_2020_SPHERE_MAPPING_FEATURE_EXTRACTION_FROM_360_FEC.pdf
-https://www.ams.giti.waseda.ac.jp/data/pdf-files/2018_IWAIT_paper_105_mengcheng.pdf
-
