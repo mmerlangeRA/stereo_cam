@@ -2,13 +2,16 @@ import os
 import numpy as np
 import cv2 as cv
 from scipy.spatial.transform import Rotation as SciPyRotation
-import scipy.spatial
-import trimesh
-
 
 def rotation_matrix_from_params(params):
     """Construct a rotation matrix from parameters."""
     return SciPyRotation.from_euler('xyz', params,degrees=False).as_matrix()
+
+def pixel_to_spherical_revised_old(image_width, image_height, pixel_x, pixel_y):
+    """Convert pixel coordinates to spherical coordinates (theta, phi)."""
+    theta = (pixel_x / image_width) * 2 * np.pi - np.pi #longitude
+    phi = (pixel_y / image_height) * np.pi - np.pi / 2 #latitude
+    return theta, phi
 
 def pixel_to_spherical_revised(image_width, image_height, pixel_x, pixel_y):
     """Convert pixel coordinates to spherical coordinates (theta, phi)."""
@@ -16,10 +19,17 @@ def pixel_to_spherical_revised(image_width, image_height, pixel_x, pixel_y):
     phi = (pixel_y / image_height) * np.pi - np.pi / 2 #latitude
     return theta, phi
 
-def spherical_to_cartesian(theta, phi):
+def spherical_to_cartesian_old(theta, phi):
     """Convert spherical coordinates to 3D cartesian coordinates."""
     x = np.cos(phi) * np.sin(theta)
     y = -np.sin(phi)
+    z = np.cos(phi) * np.cos(theta)
+    return np.array([x, y, z])
+
+def spherical_to_cartesian(theta, phi):
+    """Convert spherical coordinates to 3D cartesian coordinates."""
+    x = np.cos(phi) * np.sin(theta)
+    y = np.sin(phi)
     z = np.cos(phi) * np.cos(theta)
     return np.array([x, y, z])
 
@@ -44,6 +54,8 @@ def triangulate_point(ray1, ray2, t, R_matrix, verbose=False):
     residual_distance_normalized /= np.linalg.norm(point_3d_1)
 
     if verbose:
+        print("ray1",ray1)
+        print("ray2",ray2)
         print(A)
         print(f"Lambda1: {lambda1}, Lambda2: {lambda2}")
         print("b", b)
@@ -55,16 +67,12 @@ def triangulate_point(ray1, ray2, t, R_matrix, verbose=False):
 def get_3d_point_cam1_2_from_coordinates(keypoints_cam1, keypoints_cam2,image_width, image_height,R, t, verbose=False):
     point_image1 = np.array(keypoints_cam1) 
     point_image2 = np.array(keypoints_cam2) 
+    
     theta1, phi1 = pixel_to_spherical_revised(image_width, image_height, point_image1[0], point_image1[1])
     theta2, phi2 = pixel_to_spherical_revised(image_width, image_height, point_image2[0], point_image2[1])
+
     ray1 = spherical_to_cartesian(theta1, phi1)
     ray2 = spherical_to_cartesian(theta2, phi2)
     point_3d_cam1,point_3d_cam2,residual_distance_normalized = triangulate_point(ray1, ray2, t, R, verbose)
     return point_3d_cam1,point_3d_cam2,residual_distance_normalized
 
-def triangulate_points_to_obj(points):
-    delaunay = scipy.spatial.Delaunay(points)
-    # Create the mesh using the vertices and faces from the triangulation
-    mesh = trimesh.Trimesh(vertices=points, faces=delaunay.simplices,use_embree=True)
-    # Export the mesh to an OBJ file
-    mesh.export('output_mesh.obj')
