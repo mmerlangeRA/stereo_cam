@@ -29,12 +29,19 @@ def match_features(images):
     matches = sorted(matches, key=lambda x: x.distance)
     return matches, keypoints_list
 
-def reprojection_error(params, P1,pts1, pts2, K, dist_coeffs):
-    f = params[0]
-    K[0, 0] = K[1, 1] = f
+def reprojection_error(params,pts1, pts2, K, dist_coeffs):
+    fx = params[0]
+    fy = params[1]
+    cx= params[2]
+    cy= params[3]
+    K[0, 0]  = fx
+    K[1, 1] = fy
+    K[0, 2] = cx
+    K[1, 2] = cy
+    P1 = K @ np.hstack((np.eye(3), np.zeros((3, 1))))
 
-    rvec = params[1:4].reshape(3, 1)
-    tvec = params[4:7].reshape(3, 1)
+    rvec = params[4:7].reshape(3, 1)
+    tvec = params[7:10].reshape(3, 1)
     R, _ = cv2.Rodrigues(rvec)
     P2 = K @ np.hstack((R, tvec))
 
@@ -96,6 +103,9 @@ def compute_auto_calibration_for_images(images):
 
     # Initial guess 
     focal_length_init = 700.0   #in pixels
+    fx_init = fy_init= 700.0   #in pixels
+    cx_init = w/2
+    cy_init = h/2
     rvec_init = np.array([[-0.03], [0.08], [-0.017]], dtype=np.float32)
     tvec_init = np.array([[-1.12], [0.02], [0.01]], dtype=np.float32)
 
@@ -107,26 +117,33 @@ def compute_auto_calibration_for_images(images):
     P1 = K @ np.hstack((np.eye(3), np.zeros((3, 1))))
 
     # Initial parameter guess (focal length)
-    initial_params = np.hstack(([focal_length_init], rvec_init.ravel(), tvec_init.ravel()))
-    bounds=([100,-0.1,-0.1,-0.1,-1.13,-0.03,-0.03],
-            [2000,0.1,0.1,0.1,-1.11,0.03,0.03])
+    initial_params = np.hstack(([fx_init],[fy_init], [cx_init],[cy_init],rvec_init.ravel(), tvec_init.ravel()))
+    bounds=([100,100,w/2.5, h/2.5,-0.1,-0.1,-0.1,-1.13,-0.03,-0.03],
+            [2000,2000, w/1.5, h/1.5,0.1,0.1,0.1,-1.11,0.03,0.03])
 
     # Perform bundle adjustment
-    result = least_squares(reprojection_error, initial_params, args=(P1, pts1,pts2, K, np.zeros(5)), bounds=bounds)
+    result = least_squares(reprojection_error, initial_params, args=(pts1,pts2, K, np.zeros(5)), bounds=bounds)
     refined_params = result.x
     print(result)
-    refined_focal_length = refined_params[0]
-    refined_rvec = refined_params[1:4].reshape(3, 1)
-    refined_tvec = refined_params[4:7].reshape(3, 1)
-    refined_focal_length = result.x[0]
+    refined_fx = refined_params[0]
+    refined_fy = refined_params[1]
+    refined_cx = refined_params[2]
+    refined_cy = refined_params[3]
+    refined_rvec = refined_params[4:7].reshape(3, 1)
+    refined_tvec = refined_params[7:10].reshape(3, 1)
+
 
     # Update the camera matrix with the refined focal length
-    K[0, 0] = K[1, 1] = refined_focal_length
+    K[0, 0] = refined_fx
+    K[1, 1] = refined_fy
+    K[0, 2] = refined_cx
+    K[1, 2] = refined_cy
 
-    print("Refined Focal Length: ", refined_focal_length)
+
+    print("Refined Focal Length: ", refined_fx)
     print("Refined Rotation Vector:\n", refined_rvec)
     print("Refined Translation Vector:\n", refined_tvec)
     print("Updated Camera Matrix:\n", K)
 
-    return refined_focal_length,result.cost,refined_rvec,refined_tvec
+    return K,result.cost,refined_rvec,refined_tvec
 

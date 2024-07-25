@@ -4,23 +4,24 @@ import cv2
 from src.auto_calibration_utils import compute_auto_calibration_for_images
 
 
-def rectify_images(img1,img2):
+def rectify_images(img1,img2,K=None):
     #1084 1051 => 648 525
-    focal_length,_,refined_rvec,refined_tvec =compute_auto_calibration_for_images([img1,img2])
-    print(focal_length)
-    K=np.array([[focal_length ,  0.,664. ],
-    [0., focal_length, 656. ],
-    [0.,0.,1. ]])
-    K=np.array([[571.92127691, 0.,649.87876627],
- [  0.,561.6543542 , 594.76301074],
- [  0.,0.,1.]])
+    if K is None:
+        refined_K,_,refined_rvec,refined_tvec =compute_auto_calibration_for_images([img1,img2])
+        K = refined_K
+        print(K)
+
+#     K=np.array([[571.92127691, 0.,649.87876627],
+#  [  0.,561.6543542 , 594.76301074],
+#  [  0.,0.,1.]])
+#    rvec = np.array([[0.02824257], [0.04876492], [0.01698908]])
+#    tvec = np.array([[-1.12004838], [0.00416585], [0.00767302]])
     A1 = K # Left camera matrix intrinsic
     A2 = K # Right camera matrix intrinsic
     
     RT1 = np.eye(3, 4)
 
-    rvec = np.array([[0.02824257], [0.04876492], [0.01698908]])
-    tvec = np.array([[-1.12004838], [0.00416585], [0.00767302]])
+
 
     rvec=refined_rvec
     tvec=refined_tvec
