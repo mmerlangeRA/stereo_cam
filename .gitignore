@@ -1,5 +1,6 @@
 #project specific
 *.pt
+*.pth
 Photos
 src/PIDNet/output
 src/PIDNet/samples

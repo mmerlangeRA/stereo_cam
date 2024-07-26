@@ -14,7 +14,7 @@ from python_server.settings.settings import Settings
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
-from src.utils.path_utils import create_static_folder
+from python_server.utils.path_helper import create_static_folder
 
 logger = logging.getLogger(__name__)
 

@@ -9,8 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from python_server.utils.errors import INTERNAL_SERVER_ERROR_HTTPEXCEPTION, NOT_FOUND_HTTPEXCEPTION
 from python_server.utils.tokens import verify_token
-from python_server.components.pidnet_segementation.main import segment_image
-from src.utils.path_utils import get_photos_path, get_public_photo_path, get_static_path
+from python_server.utils.path_helper import get_photos_path, get_public_photo_path, get_static_path
 from python_server.utils.types import Processed_file_response
 logger = logging.getLogger(__name__)
 
