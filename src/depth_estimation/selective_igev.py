@@ -5,6 +5,7 @@ import torch
 from src.depth_estimation.selective_igev_code.core.igev_stereo import IGEVStereo
 from src.depth_estimation.selective_igev_code.core.utils.utils import InputPadder
 from src.depth_estimation.depth_estimator import InputPair, StereoMethod, StereoOutput,Config
+from src.utils.path_utils import get_pretrained_model_path
 # Define the directory to be added
 # directory = r'C:\Users\mmerl\projects\stereo_cam\src\depth_estimation\selective_igev_code'
 # # Check if the directory is already in the system path
@@ -35,6 +36,7 @@ class Selective_igev(StereoMethod):
 
         self._loaded_session = None
         self._loaded_model_path = None
+        default_model_path = get_pretrained_model_path("igev",'middlebury_finetune.pth')
         args_dict={
             'hidden_dims':[128]*3,
             'valid_iters':180,
@@ -44,7 +46,7 @@ class Selective_igev(StereoMethod):
             'n_gru_layers':3,
             'corr_radius':4,
             'corr_levels':2,
-            'restore_ckpt':r'C:\Users\mmerl\projects\stereo_cam\src\depth_estimation\selective_igev_code\pretrained_models\middlebury_finetune.pth'
+            'restore_ckpt':default_model_path
             
         }
         self.args = Args(**args_dict)

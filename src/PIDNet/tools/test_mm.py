@@ -3,11 +3,9 @@
 # ------------------------------------------------------------------------------
 
 import glob
-import argparse
 import cv2
 import os
 import numpy as np
-import _init_paths
 import models
 import torch
 import torch.nn.functional as F

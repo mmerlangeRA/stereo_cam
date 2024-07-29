@@ -5,14 +5,17 @@ import cv2
 import os
 import cv2.mat_wrapper
 import numpy as np
-from src.PIDNet.tools import _init_paths
-from src.PIDNet.models import models
+from src.pidnet.tools import _init_paths
+from src.pidnet.models import models
 import torch
 import torch.nn.functional as F
 from PIL import Image
 
+from src.utils.path_utils import get_pretrained_model_path
+
 root = os.getcwd()
-PIDNetRoot = os.path.join(root, 'src','PIDNet')
+
+#PIDNetRoot = os.path.join(root, 'src','PIDNet')
 a = 'pidnet-l'
 c= True
 
@@ -47,6 +50,8 @@ def input_transform(image):
     image /= std
     return image
 
+
+
 def load_pretrained(model, pretrained):
     pretrained_dict = torch.load(pretrained, map_location='cpu')
     if 'state_dict' in pretrained_dict:
@@ -62,9 +67,8 @@ def load_pretrained(model, pretrained):
     
     return model
 
-model_path  = os.path.join(PIDNetRoot, 'pretrained_models')
-model_path = os.path.join(model_path, 'cityscapes')
-model_path = os.path.join(model_path, 'PIDNet_L_Cityscapes_test.pt')
+
+model_path = get_pretrained_model_path("pidnet",'PIDNet_L_Cityscapes_test.pt')
 output_path = os.path.join(root, 'output')
 
 model = models.pidnet.get_pred_model(a, 19 if c else 11)
@@ -72,7 +76,7 @@ model = load_pretrained(model, model_path).cuda()
 model.eval()
 
 
-def segment_image(img:cv2.mat_wrapper)->str:
+def segment_image(img:cv2.mat_wrapper)->tuple[cv2.typing.MatLike,any] :
     global model
     sv_img = np.zeros_like(img).astype(np.uint8)
     img = input_transform(img)
@@ -86,14 +90,25 @@ def segment_image(img:cv2.mat_wrapper)->str:
     for i, color in enumerate(color_map):
         for j in range(3):
             sv_img[:,:,j][pred==i] = color_map[i][j]
-    sv_img = Image.fromarray(sv_img)
     
-
-
-    return sv_img
+    return sv_img,pred
 
 
 if __name__ == '__main__':
+
+    def get_image_paths(folder):
+        print("folder", folder)
+        # Define the image file extensions you want to include
+        extensions = ['.png']
+        image_paths = []
+        for ext in extensions:
+            search_path = os.path.join(folder, f'*{ext}')
+            print("Search path:", search_path)
+            found_paths = glob.glob(search_path, recursive=False)
+            print(f"Found {len(found_paths)} files with extension {ext}")
+            image_paths.extend(found_paths)
+        return image_paths
+    
     root = os.getcwd()
     image_folder_path = os.path.join(root, 'samples')
     extension =".png"
