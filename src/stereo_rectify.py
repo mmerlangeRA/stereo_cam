@@ -9,8 +9,6 @@ def rectify_images(img1,img2,K=None):
     if K is None:
         refined_K,_,refined_rvec,refined_tvec =compute_auto_calibration_for_images([img1,img2])
         K = refined_K
-        print(K)
-
 #     K=np.array([[571.92127691, 0.,649.87876627],
 #  [  0.,561.6543542 , 594.76301074],
 #  [  0.,0.,1.]])
@@ -20,8 +18,6 @@ def rectify_images(img1,img2,K=None):
     A2 = K # Right camera matrix intrinsic
     
     RT1 = np.eye(3, 4)
-
-
 
     rvec=refined_rvec
     tvec=refined_tvec

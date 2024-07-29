@@ -26,12 +26,10 @@ focal_lengths = []
 
 costs=[]
 for i in range(0,len(images),2):
-    focal_length,cost,_,_ =compute_auto_calibration_for_images(images[i:i+2])
+    refined_K,cost,refined_rvec,refined_tvec =compute_auto_calibration_for_images(images[i:i+2])
     costs.append(cost)
-    focal_lengths.append(focal_length)
 
-print(costs)
-print(focal_lengths)
+""" focal_lengths.append(focal_length)
 
 max_cost = max(costs)
 focal_length = 0
@@ -43,5 +41,4 @@ for i in range(len(focal_lengths)):
     total_weight += weight
     focal_length += focal_lengths[i]* weight
 
-focal_length /= total_weight
-print(focal_length)
+focal_length /= total_weight """

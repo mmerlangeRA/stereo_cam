@@ -125,6 +125,7 @@ def compute_auto_calibration_for_images(images):
     result = least_squares(reprojection_error, initial_params, args=(pts1,pts2, K, np.zeros(5)), bounds=bounds)
     refined_params = result.x
     print(result)
+    refined_params= result.x
     refined_fx = refined_params[0]
     refined_fy = refined_params[1]
     refined_cx = refined_params[2]

@@ -77,6 +77,13 @@ def compute_and_save_calibration(images,chessboard_size,square_size):
         # Calibrate camera
         ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
         save_calibration(mtx,dist,ret, "calibration_matrix.yaml")
+        mean_error = 0
+        for i in range(len(objpoints)):
+            imgpoints2, _ = cv.projectPoints(objpoints[i], rvecs[i], tvecs[i], mtx, dist)
+            error = cv.norm(imgpoints[i], imgpoints2, cv.NORM_L2)/len(imgpoints2)
+            mean_error += error
+        
+        print( "total error: {}".format(mean_error/len(objpoints)) )
         return mtx, dist
     print("Not enough points for calibration or mismatched number of object and image points.")
     return None, None
@@ -92,7 +99,7 @@ def undistort_image(img, mtx, dist):
 def undistort_and_crop(img, mtx, dist):
     h, w = img.shape[:2]
     newcameramtx, roi = cv.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
-    print(newcameramtx)
+    print("newcameramtx",newcameramtx)
     # undistort
     dst = cv.undistort(img, mtx, dist, None, newcameramtx)
     # crop the image
