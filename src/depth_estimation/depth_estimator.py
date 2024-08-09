@@ -1,13 +1,9 @@
-
-
 from abc import abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-
 from typing import Any, Dict, List, Tuple
 import time
 import json
-
 import numpy as np
 
 @dataclass
@@ -24,8 +20,16 @@ class Calibration:
     left_image_rect_normalized: np.ndarray = field(default_factory=lambda: np.array([0., 0., 1., 1.]))  # origin, size in percent of image size
     comment: str = ""
 
-    def to_json(self):
-        return json.dumps(self.__dict__)
+    def to_json(self) -> str:
+        # Convert the dataclass to a dictionary
+        dict_representation = asdict(self)
+
+        # Convert any numpy arrays to lists
+        for key, value in dict_representation.items():
+            if isinstance(value, np.ndarray):
+                dict_representation[key] = value.tolist()
+
+        return json.dumps(dict_representation)
 
     def from_json(json_str):
         d = json.loads(json_str)

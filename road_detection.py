@@ -9,4 +9,5 @@ if __name__ == '__main__':
     imgR_path = os.path.join(folder,'13_rectified_right.jpg')
     imgL = cv2.imread(imgL_path)
     imgR = cv2.imread(imgR_path)
+    mono_calibration_path
     get_road_edges(imgL, imgR)

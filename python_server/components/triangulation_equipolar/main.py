@@ -2,10 +2,9 @@ import csv
 import os
 from typing import List, Tuple
 import numpy as np
-import cv2 as cv
+import cv2
 from python_server.utils.path_helper import get_photos_path
-from src.triangulate.calibrate import calibrate_left_right
-from src.triangulate.triangulate import rotation_matrix_from_params,get_3d_point_cam1_2_from_coordinates
+from src.triangulate.main import rotation_matrix_from_params,get_3d_point_cam1_2_from_coordinates
 from pydantic import BaseModel, Field
 from python_server.settings.settings import settings
 
@@ -35,11 +34,11 @@ def auto_calibrate_equipoloar(request:AutoCalibrationRequest, verbose=False)->Li
     imgRight_path = request.imgRight_name if "/" in request.imgRight_name else get_photos_path(request.imgRight_name)
 
     try:
-        left_image = cv.imread(imgLeft_path)
+        left_image = cv2.imread(imgLeft_path)
     except Exception as e:
         raise FileNotFoundError(f"left_image not found {e}")
     try:
-        right_image = cv.imread(imgRight_path)
+        right_image = cv2.imread(imgRight_path)
     except Exception as e:
         raise FileNotFoundError(f"right_image not found{e}")
 

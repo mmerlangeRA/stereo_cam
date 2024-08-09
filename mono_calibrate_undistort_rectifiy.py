@@ -1,9 +1,9 @@
 import numpy as np
-import cv2 as cv
+import cv2
 import os
 from src.calibration.stereo_rectify import rectify_images
 from src.utils.path_utils import find_images_paths_in_folder, load_and_preprocess_cube_front_images
-from src.calibration.calibrate_from_cube import compute_and_save_calibration, read_calibration, undistort_and_crop
+from src.calibration.cube import compute_cube_calibration, read_calibration, save_calibration, undistort_and_crop
 
 # Chessboard' size = nb of inner corners
 chessboard_size = (9,6) 
@@ -29,31 +29,34 @@ if os.path.exists(mono_calibration_path):
     mtx, dist,rmse = read_calibration(mono_calibration_path)
 else:
     image_paths = find_images_paths_in_folder(mono_calibration_cube_photo_folder)
-    mtx, dist = compute_and_save_calibration(image_paths,chessboard_size,square_size,mono_calibration_path)
+    mtx, dist,ret = compute_cube_calibration(image_paths,chessboard_size,square_size)
+    save_calibration(mtx,dist,ret, mono_calibration_path)
 
 print(mtx)
 print(dist)
 
-image_paths =load_and_preprocess_cube_front_images(stereo_images_folder,True)
 
-nb_pairs = int(len(image_paths)/2)
+# Undistort and rectify
+front_images =load_and_preprocess_cube_front_images(stereo_images_folder,True)
+
+nb_pairs = int(len(front_images)/2)
 
 for i in range(nb_pairs):
-    leftImg = image_paths[2*i]
-    rightImg = image_paths[2*i+1]
+    leftImg = front_images[2*i]
+    rightImg = front_images[2*i+1]
     undistorted_left,newcameramtx = undistort_and_crop(leftImg, mtx, dist)
     undistorted_right,newcameramtx = undistort_and_crop(rightImg, mtx, dist)
     output_path = os.path.join(folder_path_for_undistorted, f'{i}_left.png')
-    cv.imwrite(output_path, undistorted_left)
+    cv2.imwrite(output_path, undistorted_left)
     output_path = os.path.join(folder_path_for_undistorted, f'{i}_right.png')
-    cv.imwrite(output_path, undistorted_right)
+    cv2.imwrite(output_path, undistorted_right)
     h,w=undistorted_left.shape[:2]
     ouput_rectified_height=int((h/w)*ouput_rectified_width)
-    undistorted_left = cv.resize(undistorted_left, (ouput_rectified_width, ouput_rectified_height))
-    undistorted_right = cv.resize(undistorted_right, (ouput_rectified_width, ouput_rectified_height))
+    undistorted_left = cv2.resize(undistorted_left, (ouput_rectified_width, ouput_rectified_height))
+    undistorted_right = cv2.resize(undistorted_right, (ouput_rectified_width, ouput_rectified_height))
     imgLeft_rectified,imgRight_rectified = rectify_images(undistorted_left,undistorted_right)
-    cv.imwrite(os.path.join(folder_path_for_undistorted,f'{i}_rectified_left.jpg'), imgLeft_rectified)
-    cv.imwrite(os.path.join(folder_path_for_undistorted,f'{i}_rectified_right.jpg'), imgRight_rectified)
+    cv2.imwrite(os.path.join(folder_path_for_undistorted,f'{i}_rectified_left.jpg'), imgLeft_rectified)
+    cv2.imwrite(os.path.join(folder_path_for_undistorted,f'{i}_rectified_right.jpg'), imgRight_rectified)
 
 print(newcameramtx)
 #now get calibration with und

@@ -1,9 +1,10 @@
 import csv
 import os
 import numpy as np
-import cv2 as cv
-from src.triangulate.calibrate import calibrate_left_right,rotation_matrix_from_params,get_3d_point_cam1_2_from_coordinates
+import cv2
 from src.utils.path_utils import save_calibration_params,load_calibration_params
+from src.calibration.eac import calibrate_left_right
+from src.triangulate.main import get_3d_point_cam1_2_from_coordinates, rotation_matrix_from_params
 
 #Data for estimating
 #keypoints_top : coordinates in camLeft and camRight of a "top" point on the sign
@@ -129,8 +130,8 @@ def generate_all_calibrations(initial_params,bnds,inlier_threshold,id):
             right_image_path = os.path.join(img_folder, right_image_path)
             if os.path.exists(left_image_path) and os.path.exists(right_image_path):
                 print(f"calibrating {photo}_{angle}")
-                left_image = cv.imread(os.path.join(img_folder, left_image_path))
-                right_image = cv.imread(os.path.join(img_folder, right_image_path))
+                left_image = cv2.imread(os.path.join(img_folder, left_image_path))
+                right_image = cv2.imread(os.path.join(img_folder, right_image_path))
                 best_results = calibrate_left_right(left_image, right_image, initial_params, bnds,inlier_threshold)
                 optimized_params = best_results["params"]
                 array_calibration[str(photo)+"_"+str(angle)]=optimized_params

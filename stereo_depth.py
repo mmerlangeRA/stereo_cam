@@ -1,13 +1,10 @@
 import argparse
-import json
 import os
-
 import cv2
 from matplotlib import pyplot as plt
-from python_server.components.triangulation_equipolar.main import AutoCalibrationRequest, TriangulationRequest, auto_calibrate_equipoloar, triangulate_equipolar_points
 from src.depth_estimation.selective_igev import Selective_igev
 from src.depth_estimation.depth_estimator import Calibration, InputPair
-from src.depth_estimation.selective_igev_code.demo_imgs import load_image
+from src.calibration.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
 
 def main():
     parser = argparse.ArgumentParser()
@@ -43,11 +40,36 @@ def main():
     if os.path.exists(output_directory) == False:
         os.makedirs(output_directory)
 
-    file_stem = os.path.basename(args.left_img).split('.')[0]
-    filename = os.path.join(output_directory, f'{file_stem}.png')
-    plt.imsave(filename, disp, cmap='jet')
     calibration_path = r'C:\Users\mmerl\projects\stereo_cam\calibration\stereodemo_calibration.json'
-    calibration = Calibration.from_json (open(calibration_path, 'r').read())
+    if os.path.exists(output_directory):
+        calibration = Calibration.from_json (open(calibration_path, 'r').read())
+    else:
+        height, width = image1.shape[:2]
+        K,_,refined_rvec,refined_tvec =compute_auto_calibration_for_2_stereo_standard_images(image1,image2)
+        fx = K[0, 0]
+        fy = K[1, 1]
+        cx0 = K[0, 2]
+        cx1 = cx0  # Assume both cameras share the same cx if not specified
+        cy = K[1, 2]
+
+        calibration = Calibration(
+            width=width,
+            height=height,
+            fx=fx,
+            fy=fy,
+            cx0=cx0,
+            cx1=cx1,
+            cy=cy,
+            baseline_meters=1.12
+        )
+
+        calibration.to_json()
+        open(calibration_path, 'w').write(calibration.to_json())
+
+    file_stem = os.path.basename(args.left_img).split('.')[0]
+    filename = os.path.join(output_directory, f'{file_stem}_disparity.png')
+    plt.imsave(filename, disp, cmap='jet')
+    
     depth_meters = test_igev.depth_meters_from_disparity(disp, calibration)
     filename = os.path.join(output_directory, f'{file_stem}_depth.png')
     plt.imsave(filename, depth_meters, cmap='jet')

@@ -4,7 +4,8 @@ import numpy as np
 import cv2
 import yaml
 
-from src.utils.cube_image import get_cube_sub_images
+from src.utils.cube_image import get_cube_front_image, get_cube_sub_images
+
 
 calibration_folder = "calibration"
 
@@ -28,7 +29,7 @@ def read_calibration(fname="calibration_matrix.yaml")->np.ndarray[float]:
     return np.asarray(data['camera_matrix']), np.asarray(data['dist_coeff']),data['rmse']
 
 
-def compute_and_save_calibration(image_paths:List[str],chessboard_size:cv2.typing.Size,square_size:float, save_path:str)->tuple[cv2.typing.MatLike, cv2.typing.MatLike]:
+def compute_cube_calibration(image_paths:List[str],chessboard_size:cv2.typing.Size,square_size:float)->tuple[float,cv2.typing.MatLike, cv2.typing.MatLike]:
     print(len(image_paths))
     nb_used = 0
     objpoints=[]
@@ -41,24 +42,23 @@ def compute_and_save_calibration(image_paths:List[str],chessboard_size:cv2.typin
         print(fname)
         img = cv2.imread(fname)
         
-        sub_images=get_cube_sub_images(img)
-        for sub in  sub_images:
-            gray = cv2.cvtColor(sub, cv2.COLOR_BGR2GRAY)
-            th,tw=gray.shape[:2]
-            print(f'th={th}, tw={tw}')
-            ret, corners = cv2.findChessboardCorners(gray, chessboard_size, None)
-            # If found, add object points, image points (after refining them)
-            if ret == True:
-                #ret, corners = cv2.findChessboardCorners(gray, chessboard_size, None)
-                print(f'nb corners={len(corners) if corners is not None else 0}')
-                objpoints.append(objp.copy())
-                corners2 = cv2.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
-                imgpoints.append(corners2)
-                # Draw and display the corners
-                #cv2.drawChessboardCorners(gray, chessboard_size, corners2, ret)
-                #cv2.imshow('img', gray)
-                #cv2.waitKey(500)
-                nb_used+=1
+        front_image=get_cube_front_image(img)
+        gray = cv2.cvtColor(front_image, cv2.COLOR_BGR2GRAY)
+        th,tw=gray.shape[:2]
+        print(f'th={th}, tw={tw}')
+        ret, corners = cv2.findChessboardCorners(gray, chessboard_size, None)
+        # If found, add object points, image points (after refining them)
+        if ret == True:
+            #ret, corners = cv2.findChessboardCorners(gray, chessboard_size, None)
+            print(f'nb corners={len(corners) if corners is not None else 0}')
+            objpoints.append(objp.copy())
+            corners2 = cv2.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
+            imgpoints.append(corners2)
+            # Draw and display the corners
+            #cv2.drawChessboardCorners(gray, chessboard_size, corners2, ret)
+            #cv2.imshow('img', gray)
+            #cv2.waitKey(500)
+            nb_used+=1
 
 
     print(f'nb used={nb_used} out of {len(image_paths)}')
@@ -67,7 +67,6 @@ def compute_and_save_calibration(image_paths:List[str],chessboard_size:cv2.typin
     if len(objpoints) > 0 and len(imgpoints) > 0 and len(objpoints) == len(imgpoints):
         # Calibrate camera
         ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
-        save_calibration(mtx,dist,ret, save_path)
         mean_error = 0
         for i in range(len(objpoints)):
             imgpoints2, _ = cv2.projectPoints(objpoints[i], rvecs[i], tvecs[i], mtx, dist)
@@ -75,9 +74,9 @@ def compute_and_save_calibration(image_paths:List[str],chessboard_size:cv2.typin
             mean_error += error
         
         print( "total error: {}".format(mean_error/len(objpoints)) )
-        return mtx, dist
+        return mtx, dist,ret
     print("Not enough points for calibration or mismatched number of object and image points.")
-    return None, None
+    return None, None, None
 
 def undistort_image(img:cv2.typing.MatLike, mtx:cv2.typing.MatLike, dist:cv2.typing.MatLike)->cv2.typing.MatLike:
     h, w = img.shape[:2]

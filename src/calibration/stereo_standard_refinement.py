@@ -1,25 +1,23 @@
-
-from typing import List
-import numpy as np
-from scipy.optimize import least_squares
+from typing import List, Tuple
 import cv2
-
-
-def detect_and_compute(image:cv2.typing.MatLike, useAkaze=True):
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    descriptor = cv2.AKAZE_create() if useAkaze else cv2.ORB_create()
-    keypoints, descriptors = descriptor.detectAndCompute(gray, None)
-    return keypoints, descriptors
-
-# Function to detect, compute, and match features between two images
-def match_features(images):
-    keypoints_list, descriptors_list = zip(*[detect_and_compute(img) for img in images])
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    matches = bf.match(descriptors_list[0], descriptors_list[1])
-    matches = sorted(matches, key=lambda x: x.distance)
-    return matches, keypoints_list
+import numpy as np
+from src.features_2d.utils import detectAndCompute
+from scipy.optimize import least_squares
 
 def reprojection_error(params:List[float],pts1, pts2, K, dist_coeffs:List[float])->float:
+    """
+    Computes the reprojection error for optimization.
+
+    Args:
+        params (np.ndarray): Array containing camera parameters (fx, fy, cx, cy, rvec, tvec).
+        pts1 (np.ndarray): Array of points from the first image.
+        pts2 (np.ndarray): Array of points from the second image.
+        K (np.ndarray): Camera matrix.
+        dist_coeffs (np.ndarray): Distortion coefficients.
+
+    Returns:
+        np.ndarray: Reprojection error.
+    """
     fx = params[0]
     fy = params[1]
     cx= params[2]
@@ -56,9 +54,26 @@ def reprojection_error(params:List[float],pts1, pts2, K, dist_coeffs:List[float]
     # bounds=([100,100,w/2.5, h/2.5,-0.1,-0.1,-0.1,-1.13,-0.03,-0.03],
     #         [2000,2000, w/1.5, h/1.5,0.1,0.1,0.1,-1.11,0.03,0.03])
 
-def compute_auto_calibration_for_images(images:List[cv2.typing.MatLike],verbose=False):
+
+def compute_auto_calibration_for_2_stereo_standard_images(imgLeft:cv2.typing.MatLike, imgRight:cv2.typing.MatLike,verbose=False)-> Tuple[np.ndarray, float, np.ndarray, np.ndarray]:
+    """
+    Automatically calibrates a stereo camera setup using two standard images.
+
+    Args:
+        imgLeft (cv_typing.MatLike): Left stereo image.
+        imgRight (cv_typing.MatLike): Right stereo image.
+        verbose (bool): If True, prints and saves intermediate results. Default is False.
+
+    Returns:
+        Tuple[np.ndarray, float, np.ndarray, np.ndarray]: 
+            - K: Refined camera matrix.
+            - cost: Final reprojection error cost.
+            - refined_rvec: Refined rotation vector.
+            - refined_tvec: Refined translation vector.
+    """
+    images=[imgLeft,imgRight]
     # Detect and compute features for all images
-    keypoints_list, descriptors_list = zip(*[detect_and_compute(img) for img in images])
+    keypoints_list, descriptors_list = zip(*[detectAndCompute(img) for img in images])
 
     # Create BFMatcher object
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)

@@ -1,19 +1,14 @@
+from typing import Tuple
 import numpy as np
 import cv2
+from src.calibration.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
 
-from src.calibration.auto_calibration_utils import compute_auto_calibration_for_images
 
-
-def rectify_images(img1,img2,K=None):
-    #1084 1051 => 648 525
+def rectify_images(img1,img2,K:np.ndarray | None =None)->Tuple[cv2.typing.MatLike,cv2.typing.MatLike]:
     if K is None:
-        refined_K,_,refined_rvec,refined_tvec =compute_auto_calibration_for_images([img1,img2])
+        refined_K,_,refined_rvec,refined_tvec =compute_auto_calibration_for_2_stereo_standard_images(img1,img2)
         K = refined_K
-#     K=np.array([[571.92127691, 0.,649.87876627],
-#  [  0.,561.6543542 , 594.76301074],
-#  [  0.,0.,1.]])
-#    rvec = np.array([[0.02824257], [0.04876492], [0.01698908]])
-#    tvec = np.array([[-1.12004838], [0.00416585], [0.00767302]])
+
     A1 = K # Left camera matrix intrinsic
     A2 = K # Right camera matrix intrinsic
     
