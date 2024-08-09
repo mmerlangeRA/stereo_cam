@@ -6,9 +6,6 @@ import cv2
 from src.features_2d.utils import detectAndCompute, getMatches
 from src.triangulate.main import get_3d_point_cam1_2_from_coordinates, rotation_matrix_from_params
 
-
-
-
 def getCalibrationFrom3Matching(keypoints_cam1,keypoints_cam2, initial_params, image_width, image_height,bnds,verbose=False):
     if len(keypoints_cam1) ==0:
         raise Exception("No matches found")

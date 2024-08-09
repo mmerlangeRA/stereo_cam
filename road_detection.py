@@ -1,6 +1,6 @@
 import os
 import cv2
-from src.road_detection.main import get_road_edges
+from src.road_detection.main import get_road_edges_from_stereo_cubes
 from src.calibration.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
 from src.depth_estimation.depth_estimator import Calibration
 
@@ -44,4 +44,4 @@ if __name__ == '__main__':
             cy=cy,
             baseline_meters=1.12
         )
-    get_road_edges(imgL, imgR,calibration)
+    get_road_edges_from_stereo_cubes(imgL, imgR,calibration)
