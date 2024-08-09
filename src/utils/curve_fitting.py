@@ -26,7 +26,7 @@ def fit_polynomial_ransac(x: npt.NDArray[np.float32], y: npt.NDArray[np.float32]
     inlier_mask = poly_model.named_steps['ransacregressor'].inlier_mask_
     return poly_model, inlier_mask
 
-def find_best_2_polynomial_curves(contour: npt.NDArray[np.int32], img: Optional[npt.NDArray[np.uint8]],degree=2) -> Tuple[make_pipeline, make_pipeline, npt.NDArray[np.int32], npt.NDArray[np.int32]]:
+def find_best_2_polynomial_curves(contour: npt.NDArray[np.int32],degree=2) -> Tuple[make_pipeline, make_pipeline, npt.NDArray[np.int32], npt.NDArray[np.int32]]:
     """
     Finds and plots two polynomial curves fit to the given contour points.
 
@@ -53,28 +53,7 @@ def find_best_2_polynomial_curves(contour: npt.NDArray[np.int32], img: Optional[
     # Fit the second polynomial curve using RANSAC
     second_poly_model, inliers_second = fit_polynomial_ransac(y_outliers, x_outliers,degree)
     y_inliers_second = y_outliers[inliers_second]
-    # Generate y values for plotting the polynomial curves
-    y_range = np.linspace(np.min(y), np.max(y), 500)
 
-    if img is not None:
-        # Predict x values using the polynomial models
-        x_first_poly = first_poly_model.predict(y_range[:, np.newaxis])
-        x_second_poly = second_poly_model.predict(y_range[:, np.newaxis])
-
-        first_coefficients = first_poly_model.named_steps['ransacregressor'].estimator_.coef_
-        second_coefficients = second_poly_model.named_steps['ransacregressor'].estimator_.coef_
-        nb_inliers_first = np.sum(inliers_first)
-        nb_inliers_second = np.sum(inliers_second)
-        print(f"First polynomial coefficients: {first_coefficients}, Inliers: {nb_inliers_first}")
-        print(f"First polynomial coefficients: {second_coefficients}, Inliers: {nb_inliers_second}")
-        # Plot the polynomial curves on the image
-        plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        plt.plot(x_first_poly, y_range, color='red', linewidth=2, label='First Polynomial')
-        plt.plot(x_second_poly, y_range, color='blue', linewidth=2, label='Second Polynomial')
-        plt.scatter(x, y, color='yellow', s=5, label='Contour Points')
-        plt.legend()
-        plt.title('Polynomial Curves Fit to Contour Points')
-        plt.show()
 
     return first_poly_model, second_poly_model, y_inliers_first, y_inliers_second
 

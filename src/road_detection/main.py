@@ -77,7 +77,7 @@ def get_road_edges_from_stereo_cubes(imgL: npt.NDArray[np.uint8], imgR: npt.NDAr
 
     
     contour = max(contours, key=cv2.contourArea)
-    first_poly_model, second_poly_model, y_inliers_first, y_inliers_second = find_best_2_polynomial_curves(contour, imgL)
+    first_poly_model, second_poly_model, y_inliers_first, y_inliers_second = find_best_2_polynomial_curves(contour)
     min_y_inliers_first = np.min(y_inliers_first)
     min_y_inliers_second = np.min(y_inliers_second)
     max_y_inliers_first = np.max(y_inliers_first)
@@ -142,7 +142,7 @@ class AttentionWindow:
             adjustment = 8 - (height % 8)
             self.bottom += adjustment
 
-def get_road_edges_from_eac(img: npt.NDArray[np.uint8], window:AttentionWindow, camHeight=2.,debug=True) -> float:
+def get_road_edges_from_eac(img: npt.NDArray[np.uint8], window:AttentionWindow, camHeight=2.,debug=True) :
     """
     Estimates road edges from EAC image.
     We assume road is a plane and that the camera view direction is // to it
@@ -161,7 +161,10 @@ def get_road_edges_from_eac(img: npt.NDArray[np.uint8], window:AttentionWindow, 
     contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     contour = max(contours, key=cv2.contourArea)
-    first_poly_model, second_poly_model, y_inliers_first, y_inliers_second = find_best_2_polynomial_curves(contour, img,degree=1)
+    contour_points = contour[:, 0, :]
+    contour_x = contour_points[:, 0]
+    contour_y = contour_points[:, 1]
+    first_poly_model, second_poly_model, y_inliers_first, y_inliers_second = find_best_2_polynomial_curves(contour,degree=1)
     min_y_inliers_first = np.min(y_inliers_first)
     min_y_inliers_second = np.min(y_inliers_second)
     max_y_inliers_first = np.max(y_inliers_first)
@@ -211,4 +214,4 @@ def get_road_edges_from_eac(img: npt.NDArray[np.uint8], window:AttentionWindow, 
         
         cv2.imshow('contours', contour_image)
         cv2.imwrite(get_static_folder_path("contours.png"), contour_image)
-    return np.mean(distances)
+    return np.mean(distances),first_poly_model, second_poly_model,contour_x,contour_y
