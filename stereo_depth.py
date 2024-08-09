@@ -41,7 +41,7 @@ def main():
         os.makedirs(output_directory)
 
     calibration_path = r'C:\Users\mmerl\projects\stereo_cam\calibration\stereodemo_calibration.json'
-    if os.path.exists(output_directory):
+    if os.path.exists(calibration_path):
         calibration = Calibration.from_json (open(calibration_path, 'r').read())
     else:
         height, width = image1.shape[:2]

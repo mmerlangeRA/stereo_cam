@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.pipeline import make_pipeline
 from src.pidnet.main import segment_image
 from src.utils.geo import create_Q_matrix
-from src.depth_estimation.depth_estimator import InputPair
+from src.depth_estimation.depth_estimator import Calibration, InputPair
 from src.depth_estimation.selective_igev import Selective_igev
 from src.utils.path_utils import get_static_folder_path
 from typing import Tuple, List, Optional
@@ -44,7 +44,7 @@ def segment_road_image(img: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
     return thresh
 
-def get_road_edges(imgL: npt.NDArray[np.uint8], imgR: npt.NDArray[np.uint8], debug= True) -> None:
+def get_road_edges(imgL: npt.NDArray[np.uint8], imgR: npt.NDArray[np.uint8], calibration:Calibration,debug= True) -> None:
     """
     Estimates road edges from stereo images.
 
@@ -62,6 +62,11 @@ def get_road_edges(imgL: npt.NDArray[np.uint8], imgR: npt.NDArray[np.uint8], deb
     baseline = 1.12  # in meters
     c_x = 331.99987265  # principal point x-coordinate
     c_y = 387.5000997  # principal point y-coordinate
+
+    focal_length = calibration.fx
+    baseline = calibration.baseline_meters
+    c_x = calibration.cx0
+    c_y = calibration.cy
 
     depth_map = (focal_length * baseline) / (disparity_map + 1e-6)
     # Assuming you have a function to perform semantic segmentation
@@ -84,7 +89,7 @@ def get_road_edges(imgL: npt.NDArray[np.uint8], imgR: npt.NDArray[np.uint8], deb
 
     distances = []
     points = []
-    for y in range(minY + 60, maxY - 60):
+    for y in range(minY +0, maxY - 0):
         x_first_poly = first_poly_model.predict([[y]])[0]
         x_second_poly = second_poly_model.predict([[y]])[0]
         p1, d1 = compute_3d_position_from_disparity(x_first_poly, y, disparity_map, focal_length, c_x, c_y, baseline)
