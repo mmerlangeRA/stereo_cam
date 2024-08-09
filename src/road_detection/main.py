@@ -2,7 +2,6 @@ import random
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
-from sklearn.pipeline import make_pipeline
 from src.pidnet.main import segment_image
 from src.utils.geo import create_Q_matrix
 from src.depth_estimation.depth_estimator import Calibration, InputPair
@@ -16,7 +15,7 @@ from src.utils.disparity import compute_3d_position_from_disparity
 from src.utils.coordinate_transforms import pixel_to_spherical, spherical_to_cartesian
 
 
-def segment_road_image(img: npt.NDArray[np.uint8],kernel_width=10) -> npt.NDArray[np.uint8]:
+def segment_road_image(img: npt.NDArray[np.uint8],kernel_width=10,debug=False) -> npt.NDArray[np.uint8]:
     """
     Computes binary image corresponding to road.
 
@@ -27,7 +26,9 @@ def segment_road_image(img: npt.NDArray[np.uint8],kernel_width=10) -> npt.NDArra
 
     """
     segmented_image, pred = segment_image(img)
-    cv2.imshow("se",segmented_image)
+    if debug:
+        cv2.imwrite(get_static_folder_path("segmented.png"), segmented_image)
+    #cv2.imshow("se",segmented_image)
     # Create a mask for the road class
     road_mask = (pred == 0).astype(np.uint8)
     # Check if the mask has the same dimensions as the segmented image
@@ -142,7 +143,7 @@ class AttentionWindow:
             adjustment = 8 - (height % 8)
             self.bottom += adjustment
 
-def get_road_edges_from_eac(img: npt.NDArray[np.uint8], window:AttentionWindow, camHeight=2.,debug=True) :
+def get_road_edges_from_eac(img: npt.NDArray[np.uint8], window:AttentionWindow, camHeight=2.,degree=1,kernel_width=20,debug=False) :
     """
     Estimates road edges from EAC image.
     We assume road is a plane and that the camera view direction is // to it
@@ -152,19 +153,20 @@ def get_road_edges_from_eac(img: npt.NDArray[np.uint8], window:AttentionWindow, 
     """
     window.makeItMultipleOf8()
     windowed = img[window.top:window.bottom, window.left:window.right]
+    if debug:
+        cv2.imwrite(get_static_folder_path("windowed.png"), windowed)
     # Assuming you have a function to perform semantic segmentation
-    thresh_windowed = segment_road_image(windowed,20)
+    thresh_windowed = segment_road_image(windowed,kernel_width,debug=debug)
     thresh = np.zeros(img.shape[:2], dtype=np.uint8)
     thresh[window.top:window.bottom, window.left:window.right] = thresh_windowed
 
-
     contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
     contour = max(contours, key=cv2.contourArea)
     contour_points = contour[:, 0, :]
     contour_x = contour_points[:, 0]
     contour_y = contour_points[:, 1]
-    first_poly_model, second_poly_model, y_inliers_first, y_inliers_second = find_best_2_polynomial_curves(contour,degree=1)
+
+    first_poly_model, second_poly_model, y_inliers_first, y_inliers_second = find_best_2_polynomial_curves(contour,degree=degree)
     min_y_inliers_first = np.min(y_inliers_first)
     min_y_inliers_second = np.min(y_inliers_second)
     max_y_inliers_first = np.max(y_inliers_first)

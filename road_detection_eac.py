@@ -1,15 +1,12 @@
-import os
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
 from src.road_detection.main import AttentionWindow, get_road_edges_from_eac
 
 
-
 if __name__ == '__main__':
     img_path = r'C:\Users\mmerl\projects\stereo_cam\Photos\P5\D_P5_CAM_G_0_EAC.png'
     img = cv2.imread(img_path, cv2.IMREAD_COLOR)
-    
 
     height, width = img.shape[:2]
 
@@ -19,31 +16,20 @@ if __name__ == '__main__':
     img = cv2.resize(img, (max_width, max_height))
     height, width = img.shape[:2]
 
-    # Create a mask for segmentation and further work
+    # Attention window for segementation and road detection
     window_Width= int(width/3)
-    mask = np.zeros((height, width), dtype=np.uint8)
-    
-    # Set the region where x is between window_Width and 540 to width-window_Width (white)
     limit_left = window_Width
     limit_right = width-window_Width-int(width/10)
     limit_top = int(height/2.5)
     limit_bottom = height-int(height/2.5)
-    mask[limit_top:limit_bottom, limit_left:limit_right] = 255
 
-    # Apply the mask to the original image
-    img_for_segmentation = cv2.bitwise_and(img, img, mask=mask)
-
-    img_for_segmentation =img[limit_top:limit_bottom, limit_left:limit_right]
-    cv2.imshow('img_for_segmentation', img_for_segmentation)
-    print(img_for_segmentation.shape)
-  
     window = AttentionWindow(limit_left, limit_right, limit_top, limit_bottom)
 
-    average_width,first_poly_model, second_poly_model,x,y = get_road_edges_from_eac(img,window,1.65)
+    #processing
+    average_width,first_poly_model, second_poly_model,x,y = get_road_edges_from_eac(img,window,camHeight=1.65,degree=1,debug=True)
 
-        # Generate y values for plotting the polynomial curves
+    # Generate y values for plotting the polynomial curves
     y_range = np.linspace(np.min(y), np.max(y), 500)
-
 
     # Predict x values using the polynomial models
     x_first_poly = first_poly_model.predict(y_range[:, np.newaxis])

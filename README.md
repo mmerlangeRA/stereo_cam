@@ -103,3 +103,5 @@ Pour que cela fonctionne, il faut ajouter dans src/pretrained_models le dossier 
 ## Docker installation
 
 to be done
+
+C:\Users\mmerl\anaconda3\envs\logiroadhitnet\python.exe -m streamlit run simple_app.py
