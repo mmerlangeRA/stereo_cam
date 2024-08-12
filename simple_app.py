@@ -4,7 +4,8 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
-from src.road_detection.main import AttentionWindow, compute_road_width_from_eac
+from src.road_detection.main import compute_road_width_from_eac
+from src.road_detection.common import AttentionWindow
 import time
 
 

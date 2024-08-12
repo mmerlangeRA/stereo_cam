@@ -3,7 +3,9 @@ set_paths()
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
-from src.road_detection.main import AttentionWindow, compute_road_width_from_eac
+from src.road_detection.seg_former import seg_segment_image
+from src.road_detection.main import compute_road_width_from_eac
+from src.road_detection.common import AttentionWindow
 import argparse
 
 def parse_arguments():
@@ -43,7 +45,7 @@ if __name__ == '__main__':
     limit_top = int(args.window_top * height)
     limit_bottom = int(args.window_bottom * height)
     window = AttentionWindow(limit_left, limit_right, limit_top, limit_bottom)
-
+    print(window)
     # Other params
     degree = args.degree
     camHeight = args.camHeight

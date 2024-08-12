@@ -13,72 +13,11 @@ import numpy.typing as npt
 from src.utils.curve_fitting import find_best_2_polynomial_curves
 from src.utils.disparity import compute_3d_position_from_disparity
 from src.utils.coordinate_transforms import pixel_to_spherical, spherical_to_cartesian
+from src.road_detection.segment import segment_road_image
+from src.road_detection.common import AttentionWindow
 
-class AttentionWindow:
-    left:int
-    right:int
-    top:int
-    bottom:int
-    def __init__(self,left:int, right:int, top:int, bottom:int) -> None:
-        self.left = left
-        self.right = right
-        self.top = top
-        self.bottom = bottom
-        self.makeItMultipleOf8()
 
-    def makeItMultipleOf8(self) -> None:
-        '''
-        Ensure width and height are multiple of 8
-        '''
-        # Adjust width (right - left)
-        width = self.right - self.left
-        if width % 8 != 0:
-            # Increase right to make width a multiple of 4
-            adjustment = 8 - (width % 8)
-            self.right += adjustment
-
-        # Adjust height (bottom - top)
-        height = self.bottom - self.top
-        if height % 8 != 0:
-            # Increase bottom to make height a multiple of 4
-            adjustment = 8 - (height % 8)
-            self.bottom += adjustment
-    def __str__(self) -> str:
-        return f"AttentionWindow(left={self.left}, right={self.right}, top={self.top}, bottom={self.bottom})"
-
-def segment_road_image(img: npt.NDArray[np.uint8],kernel_width=10,debug=False) -> npt.NDArray[np.uint8]:
-    """
-    Computes binary image corresponding to road.
-
-    Parameters:
-    - img: rgb image
-    returns
-    - binary image
-
-    """
-    segmented_image, pred = segment_image(img)
-    if debug:
-        cv2.imwrite(get_static_folder_path("segmented.png"), segmented_image)
-        cv2.imshow("segmented_image",segmented_image)
-    # Create a mask for the road class
-    road_mask = (pred == 0).astype(np.uint8)
-    # Check if the mask has the same dimensions as the segmented image
-    assert road_mask.shape == segmented_image.shape[:2], "Mask size does not match the image size."
-
-    masked_segmented = cv2.bitwise_and(segmented_image, segmented_image, mask=road_mask)
-
-    gray = cv2.cvtColor(masked_segmented, cv2.COLOR_BGR2GRAY)
-    # we clean the image by removing small blobs
-
-    kernel_size = (kernel_width,kernel_width) #this size could be computed dynamically from image size
-
-    ret, thresh = cv2.threshold(gray, 1, 255, 0)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, kernel_size)
-    # Apply the dilation operation to the edged image
-    thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
-    return thresh
-
-def get_road_edges_from_stereo_cubes(imgL: npt.NDArray[np.uint8], imgR: npt.NDArray[np.uint8], calibration:Calibration,debug= True) -> None:
+def compute_road_width_from_stereo_cubes(imgL: npt.NDArray[np.uint8], imgR: npt.NDArray[np.uint8], calibration:Calibration,degree=1,debug= False) :
     """
     Estimates road edges from stereo images.
 
@@ -89,7 +28,7 @@ def get_road_edges_from_stereo_cubes(imgL: npt.NDArray[np.uint8], imgR: npt.NDAr
     Important : input images must be rectified before and their size must be power of 8.
     """
     test_igev = Selective_igev(None, None)
-    input_pair = InputPair(left_image=imgL, right_image=imgR, status="started", calibration=None)
+    input_pair = InputPair(left_image=imgL, right_image=imgR, status="started", calibration=calibration)
     stereo_output = test_igev.compute_disparity(input_pair)
     disparity_map = stereo_output.disparity_pixels
 
@@ -104,7 +43,11 @@ def get_road_edges_from_stereo_cubes(imgL: npt.NDArray[np.uint8], imgR: npt.NDAr
     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     
     contour = max(contours, key=cv2.contourArea)
-    first_poly_model, second_poly_model, y_inliers_first, y_inliers_second = find_best_2_polynomial_curves(contour)
+    contour_points = contour[:, 0, :]
+    contour_x = contour_points[:, 0]
+    contour_y = contour_points[:, 1]
+
+    first_poly_model, second_poly_model, y_inliers_first, y_inliers_second = find_best_2_polynomial_curves(contour,degree=degree)
     min_y_inliers_first = np.min(y_inliers_first)
     min_y_inliers_second = np.min(y_inliers_second)
     max_y_inliers_first = np.max(y_inliers_first)
@@ -146,6 +89,7 @@ def get_road_edges_from_stereo_cubes(imgL: npt.NDArray[np.uint8], imgR: npt.NDAr
         cv2.imwrite(get_static_folder_path("disparity.png"), disparity_map)
         cv2.imwrite(get_static_folder_path("contours.png"), contour_image)
 
+    return np.mean(distances),first_poly_model, second_poly_model,contour_x,contour_y
 
 
 def compute_road_width_from_eac(img: npt.NDArray[np.uint8], window:AttentionWindow, camHeight=2.,degree=1,kernel_width=20,debug=False) :
@@ -156,7 +100,8 @@ def compute_road_width_from_eac(img: npt.NDArray[np.uint8], window:AttentionWind
     Parameters:
     - img: EAC image.
     """
-    windowed = img[window.top:window.bottom, window.left:window.right]
+    #windowed = img[window.top:window.bottom, window.left:window.right]
+    windowed = window.crop_image(img)
     if debug:
         cv2.imwrite(get_static_folder_path("windowed.png"), windowed)
     # Assuming you have a function to perform semantic segmentation
