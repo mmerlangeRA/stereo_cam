@@ -1,24 +1,11 @@
 import numpy as np
-import cv2 as cv
 from scipy.spatial.transform import Rotation as SciPyRotation
 from typing import List, Tuple
+from src.utils.coordinate_transforms import pixel_to_spherical, spherical_to_cartesian
 
 def rotation_matrix_from_params(params: List[float]) -> np.ndarray:
     """Construct a rotation matrix from parameters."""
     return SciPyRotation.from_euler('xyz', params, degrees=False).as_matrix()
-
-def pixel_to_spherical(image_width: int, image_height: int, pixel_x: int, pixel_y: int) -> Tuple[float, float]:
-    """Convert pixel coordinates to spherical coordinates (theta, phi)."""
-    theta = (pixel_x / image_width) * 2 * np.pi - np.pi # longitude
-    phi = (pixel_y / image_height) * np.pi - np.pi / 2 # latitude
-    return theta, phi
-
-def spherical_to_cartesian(theta: float, phi: float) -> np.ndarray:
-    """Convert spherical coordinates to 3D cartesian coordinates."""
-    x = np.cos(phi) * np.sin(theta)
-    y = np.sin(phi)
-    z = np.cos(phi) * np.cos(theta)
-    return np.array([x, y, z])
 
 def triangulate_point(ray1: np.ndarray, ray2: np.ndarray, t: np.ndarray, R_matrix: np.ndarray, verbose: bool=False) -> Tuple[np.ndarray, np.ndarray, float]:
     """Triangulate a 3D point from two rays and the relative camera transformation."""

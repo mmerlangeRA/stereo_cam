@@ -68,7 +68,13 @@ python triangulate_test.py
 Depth estimation
 
 ```bash
-python stereo_depth.py --restore_ckpt pretrained_models\middlebury_finetune.pth --valid_iters 180 --max_disp 768 --left_img r'C:\Users\mmerl\projects\stereo_cam\static\photos\13_rectified_left.jpg' --right_img r'C:\Users\mmerl\projects\stereo_cam\static\photos\13_rectified_right.jpg'  --output_directory output
+python stereo_depth.py --restore_ckpt pretrained_models\middlebury_finetune.pth --valid_iters 180 --max_disp 768 --left_img C:\Users\mmerl\projects\stereo_cam\static\photos\13_rectified_left.jpg --right_img C:\Users\mmerl\projects\stereo_cam\static\photos\13_rectified_right.jpg  --output_directory output
+```
+
+Road segmentation
+
+```bash
+python road_detection.py
 ```
 
 ## Lancement du serveur sur le port 8001
@@ -97,3 +103,5 @@ Pour que cela fonctionne, il faut ajouter dans src/pretrained_models le dossier 
 ## Docker installation
 
 to be done
+
+C:\Users\mmerl\anaconda3\envs\logiroadhitnet\python.exe -m streamlit run simple_app.py
