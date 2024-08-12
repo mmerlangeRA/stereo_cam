@@ -1,10 +1,13 @@
+from bootstrap import set_paths
+set_paths()
 import csv
 import os
 import numpy as np
 import cv2
-from src.utils.path_utils import save_calibration_params,load_calibration_params
+from src.calibration.cube import save_calibration_params,load_calibration_params
 from src.calibration.eac import calibrate_left_right
 from src.triangulate.main import get_3d_point_cam1_2_from_coordinates, rotation_matrix_from_params
+
 
 #Data for estimating
 #keypoints_top : coordinates in camLeft and camRight of a "top" point on the sign

@@ -1,5 +1,3 @@
-import csv
-import os
 from typing import List, Tuple
 import numpy as np
 import cv2
@@ -7,6 +5,7 @@ from python_server.utils.path_helper import get_photos_path
 from src.triangulate.main import rotation_matrix_from_params,get_3d_point_cam1_2_from_coordinates
 from pydantic import BaseModel, Field
 from python_server.settings.settings import settings
+from src.calibration.eac import calibrate_left_right
 
 class TriangulationRequest(BaseModel):
     keypoints_cam1: Tuple[float, float] = Field(..., example=(0, 0))

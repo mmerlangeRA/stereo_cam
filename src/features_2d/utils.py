@@ -1,7 +1,7 @@
 import cv2
 from typing import Tuple, List
 
-def detectAndCompute(img: cv2.Mat) -> Tuple[List[cv2.KeyPoint], cv2.Mat]:
+def detectAndComputeKPandDescriptors(img: cv2.Mat) -> Tuple[List[cv2.KeyPoint], cv2.Mat]:
     """
     Detects keypoints and computes descriptors using AKAZE.
 

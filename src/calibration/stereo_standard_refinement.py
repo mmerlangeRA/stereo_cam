@@ -1,7 +1,7 @@
 from typing import List, Tuple
 import cv2
 import numpy as np
-from src.features_2d.utils import detectAndCompute
+from src.features_2d.utils import detectAndComputeKPandDescriptors
 from scipy.optimize import least_squares
 
 def reprojection_error(params:List[float],pts1, pts2, K, dist_coeffs:List[float])->float:
@@ -73,7 +73,7 @@ def compute_auto_calibration_for_2_stereo_standard_images(imgLeft:cv2.typing.Mat
     """
     images=[imgLeft,imgRight]
     # Detect and compute features for all images
-    keypoints_list, descriptors_list = zip(*[detectAndCompute(img) for img in images])
+    keypoints_list, descriptors_list = zip(*[detectAndComputeKPandDescriptors(img) for img in images])
 
     # Create BFMatcher object
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)

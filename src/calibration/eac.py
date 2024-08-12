@@ -3,7 +3,7 @@ from typing import List
 import numpy as np
 from scipy.optimize import minimize
 import cv2
-from src.features_2d.utils import detectAndCompute, getMatches
+from src.features_2d.utils import detectAndComputeKPandDescriptors, getMatches
 from src.triangulate.main import get_3d_point_cam1_2_from_coordinates, rotation_matrix_from_params
 
 def getCalibrationFrom3Matching(keypoints_cam1,keypoints_cam2, initial_params, image_width, image_height,bnds,verbose=False):
@@ -25,7 +25,6 @@ def getCalibrationFrom3Matching(keypoints_cam1,keypoints_cam2, initial_params, i
         for i in range(len(keypoints_cam1)):
             _,_,residual_distance_normalized = get_3d_point_cam1_2_from_coordinates(keypoints_cam1[i], keypoints_cam2[i], image_width, image_height, R, t)
             total_residual += residual_distance_normalized
-        #print("total_residual",total_residual)
         return total_residual
     result = minimize(optimizeRT, initial_params, bounds=bnds)
     optimized_params = result.x
@@ -40,17 +39,18 @@ def computeInliers(R, t, keypoints_cam1, keypoints_cam2, threshold, image_width,
             inliers.append(i)
     return inliers
 
-def calibrate_left_right(imLeft:cv2.Mat, imRight:cv2.Mat, initial_params,bnds,inlier_threshold,nn_match_ratio=0.5):
-    print("calibrate_left_right")
-    print(f"initial_params {initial_params}")
-    print(f"bnds {bnds}")
+def calibrate_left_right(imLeft:cv2.Mat, imRight:cv2.Mat, initial_params,bnds,inlier_threshold,nn_match_ratio=0.5, verbose=False):
+    if verbose:
+        print("calibrate_left_right")
+        print(f"initial_params {initial_params}")
+        print(f"bnds {bnds}")
     max_iter = 500
     prob = 0.95
     num_elements = 4
-    kpts1, desc1 = detectAndCompute(imLeft)
-    kpts2, desc2 = detectAndCompute(imRight)
+    kpts1, desc1 = detectAndComputeKPandDescriptors(imLeft)
+    kpts2, desc2 = detectAndComputeKPandDescriptors(imRight)
+
     #kpts to uv
-    print(kpts1[0].pt)
     uv1 = [[k.pt[0], k.pt[1]] for k in kpts1]
     uv2 = [[k.pt[0], k.pt[1]] for k in kpts2]
     nn_matches = getMatches(desc1, desc2)
@@ -62,22 +62,23 @@ def calibrate_left_right(imLeft:cv2.Mat, imRight:cv2.Mat, initial_params,bnds,in
             matched1.append(uv1[m.queryIdx])
             matched2.append(uv2[m.trainIdx])
             good_matches[i] = [1, 0] 
-    Matched = cv2.drawMatchesKnn(imLeft, 
-                             kpts1, 
-                             imRight, 
-                             kpts2, 
-                             nn_matches, 
-                             outImg=None, 
-                             matchColor=(0, 155, 0), 
-                             singlePointColor=(0, 255, 255), 
-                             matchesMask=good_matches, 
-                             flags=0
-                             ) 
+    if verbose:
+        Matched = cv2.drawMatchesKnn(imLeft, 
+                                    kpts1, 
+                                    imRight, 
+                                    kpts2, 
+                                    nn_matches, 
+                                    outImg=None, 
+                                    matchColor=(0, 155, 0), 
+                                    singlePointColor=(0, 255, 255), 
+                                    matchesMask=good_matches, 
+                                    flags=0
+                                    ) 
   
-# Displaying the image  
-    cv2.imwrite('Match.jpg', Matched)
-    #cv2.waitKey(0)
-    print(f'nb good matches {len(matched1)} out of {len(nn_matches)}')
+        # saving the image  
+        cv2.imwrite('Match.jpg', Matched)
+        #cv2.waitKey(0)
+        print(f'nb good matches {len(matched1)} out of {len(nn_matches)}')
     nb_iter = 0
     nb_good_matches = len(matched1)
     best_result = {
@@ -101,14 +102,15 @@ def calibrate_left_right(imLeft:cv2.Mat, imRight:cv2.Mat, initial_params,bnds,in
 
         residual_per_inlier = residual/nb_inliers
         if nb_inliers > best_result["max_inliers"]:
-            print(f'new best result with {nb_inliers} inliers, iteration is {nb_iter}, residual_per_inlier is {residual_per_inlier}')
-            print("optimized_params", optimized_params)
             best_result["max_inliers"] = nb_inliers
             best_result["R"] = optimized_R
             best_result["params"] = optimized_params
             best_result["t"] = optimized_t
             max_iter = np.log(1.-prob)/np.log(1.- pow(nb_inliers/len(matched1),num_elements))
-            print(f"now iter is {nb_iter} and max_iter is {max_iter}")
+            if verbose:
+                print(f'new best result with {nb_inliers} inliers, iteration is {nb_iter}, residual_per_inlier is {residual_per_inlier}')
+                print("optimized_params", optimized_params)
+                print(f"now iter is {nb_iter} and max_iter is {max_iter}")
         nb_iter+=1
     
     sub_uv1=[matched1[i] for i in inliers]
@@ -119,11 +121,12 @@ def calibrate_left_right(imLeft:cv2.Mat, imRight:cv2.Mat, initial_params,bnds,in
     optimized_t = optimized_params[3:]
     inliers = computeInliers(optimized_R, optimized_t, matched1, matched2, inlier_threshold, imLeft.shape[1], imLeft.shape[0])
     nb_inliers = len(inliers)
-    print(f'refined best result with {nb_inliers} inliers')
-    #best_result["max_inliers"] = nb_inliers
-    #best_result["R"] = optimized_R
-    #best_result["t"] = optimized_t
-    print("refined optimized_params on all inliers", optimized_params)
+    if verbose:
+        print(f'refined best result with {nb_inliers} inliers')
+        #best_result["max_inliers"] = nb_inliers
+        #best_result["R"] = optimized_R
+        #best_result["t"] = optimized_t
+        print("refined optimized_params on all inliers", optimized_params)
 
     return best_result
 

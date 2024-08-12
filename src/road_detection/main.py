@@ -24,9 +24,12 @@ class AttentionWindow:
         self.right = right
         self.top = top
         self.bottom = bottom
-        self.makeItMultipleOf8
+        self.makeItMultipleOf8()
 
     def makeItMultipleOf8(self) -> None:
+        '''
+        Ensure width and height are multiple of 8
+        '''
         # Adjust width (right - left)
         width = self.right - self.left
         if width % 8 != 0:
@@ -40,6 +43,8 @@ class AttentionWindow:
             # Increase bottom to make height a multiple of 4
             adjustment = 8 - (height % 8)
             self.bottom += adjustment
+    def __str__(self) -> str:
+        return f"AttentionWindow(left={self.left}, right={self.right}, top={self.top}, bottom={self.bottom})"
 
 def segment_road_image(img: npt.NDArray[np.uint8],kernel_width=10,debug=False) -> npt.NDArray[np.uint8]:
     """
@@ -54,7 +59,7 @@ def segment_road_image(img: npt.NDArray[np.uint8],kernel_width=10,debug=False) -
     segmented_image, pred = segment_image(img)
     if debug:
         cv2.imwrite(get_static_folder_path("segmented.png"), segmented_image)
-    #cv2.imshow("se",segmented_image)
+        cv2.imshow("segmented_image",segmented_image)
     # Create a mask for the road class
     road_mask = (pred == 0).astype(np.uint8)
     # Check if the mask has the same dimensions as the segmented image
@@ -80,28 +85,23 @@ def get_road_edges_from_stereo_cubes(imgL: npt.NDArray[np.uint8], imgR: npt.NDAr
     Parameters:
     - imgL: Left stereo image.
     - imgR: Right stereo image.
+
+    Important : input images must be rectified before and their size must be power of 8.
     """
     test_igev = Selective_igev(None, None)
     input_pair = InputPair(left_image=imgL, right_image=imgR, status="started", calibration=None)
     stereo_output = test_igev.compute_disparity(input_pair)
     disparity_map = stereo_output.disparity_pixels
-    cv2.imwrite(get_static_folder_path("disparity.png"), disparity_map)
-
-    focal_length = 700.0  # in pixels
-    baseline = 1.12  # in meters
-    c_x = 331.99987265  # principal point x-coordinate
-    c_y = 387.5000997  # principal point y-coordinate
 
     focal_length = calibration.fx
     baseline = calibration.baseline_meters
     c_x = calibration.cx0
     c_y = calibration.cy
 
-    depth_map = (focal_length * baseline) / (disparity_map + 1e-6)
+    #depth_map = (focal_length * baseline) / (disparity_map + 1e-6)
     # Assuming you have a function to perform semantic segmentation
-    thresh = segment_road_image(imgL)
+    thresh = segment_road_image(imgL, debug=debug)
     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
     
     contour = max(contours, key=cv2.contourArea)
     first_poly_model, second_poly_model, y_inliers_first, y_inliers_second = find_best_2_polynomial_curves(contour)
@@ -130,6 +130,7 @@ def get_road_edges_from_stereo_cubes(imgL: npt.NDArray[np.uint8], imgR: npt.NDAr
     
     if debug:
         print(f'found {len(contours)}')
+        
         contour_image = imgL.copy()
         # Draw contours with random colors
         for contour in contours:
@@ -141,6 +142,8 @@ def get_road_edges_from_stereo_cubes(imgL: npt.NDArray[np.uint8], imgR: npt.NDAr
         print(distances)
         
         cv2.imshow('contours', contour_image)
+        cv2.imshow('disparity_map', disparity_map)
+        cv2.imwrite(get_static_folder_path("disparity.png"), disparity_map)
         cv2.imwrite(get_static_folder_path("contours.png"), contour_image)
 
 
