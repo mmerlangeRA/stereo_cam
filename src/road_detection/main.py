@@ -14,6 +14,32 @@ from src.utils.curve_fitting import find_best_2_polynomial_curves
 from src.utils.disparity import compute_3d_position_from_disparity
 from src.utils.coordinate_transforms import pixel_to_spherical, spherical_to_cartesian
 
+class AttentionWindow:
+    left:int
+    right:int
+    top:int
+    bottom:int
+    def __init__(self,left:int, right:int, top:int, bottom:int) -> None:
+        self.left = left
+        self.right = right
+        self.top = top
+        self.bottom = bottom
+        self.makeItMultipleOf8
+
+    def makeItMultipleOf8(self) -> None:
+        # Adjust width (right - left)
+        width = self.right - self.left
+        if width % 8 != 0:
+            # Increase right to make width a multiple of 4
+            adjustment = 8 - (width % 8)
+            self.right += adjustment
+
+        # Adjust height (bottom - top)
+        height = self.bottom - self.top
+        if height % 8 != 0:
+            # Increase bottom to make height a multiple of 4
+            adjustment = 8 - (height % 8)
+            self.bottom += adjustment
 
 def segment_road_image(img: npt.NDArray[np.uint8],kernel_width=10,debug=False) -> npt.NDArray[np.uint8]:
     """
@@ -117,33 +143,9 @@ def get_road_edges_from_stereo_cubes(imgL: npt.NDArray[np.uint8], imgR: npt.NDAr
         cv2.imshow('contours', contour_image)
         cv2.imwrite(get_static_folder_path("contours.png"), contour_image)
 
-class AttentionWindow:
-    left:int
-    right:int
-    top:int
-    bottom:int
-    def __init__(self,left:int, right:int, top:int, bottom:int) -> None:
-        self.left = left
-        self.right = right
-        self.top = top
-        self.bottom = bottom
 
-    def makeItMultipleOf8(self) -> None:
-        # Adjust width (right - left)
-        width = self.right - self.left
-        if width % 8 != 0:
-            # Increase right to make width a multiple of 4
-            adjustment = 8 - (width % 8)
-            self.right += adjustment
 
-        # Adjust height (bottom - top)
-        height = self.bottom - self.top
-        if height % 8 != 0:
-            # Increase bottom to make height a multiple of 4
-            adjustment = 8 - (height % 8)
-            self.bottom += adjustment
-
-def get_road_edges_from_eac(img: npt.NDArray[np.uint8], window:AttentionWindow, camHeight=2.,degree=1,kernel_width=20,debug=False) :
+def compute_road_width_from_eac(img: npt.NDArray[np.uint8], window:AttentionWindow, camHeight=2.,degree=1,kernel_width=20,debug=False) :
     """
     Estimates road edges from EAC image.
     We assume road is a plane and that the camera view direction is // to it
@@ -151,7 +153,6 @@ def get_road_edges_from_eac(img: npt.NDArray[np.uint8], window:AttentionWindow, 
     Parameters:
     - img: EAC image.
     """
-    window.makeItMultipleOf8()
     windowed = img[window.top:window.bottom, window.left:window.right]
     if debug:
         cv2.imwrite(get_static_folder_path("windowed.png"), windowed)

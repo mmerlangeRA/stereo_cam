@@ -4,7 +4,7 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
-from src.road_detection.main import AttentionWindow, get_road_edges_from_eac
+from src.road_detection.main import AttentionWindow, compute_road_width_from_eac
 import time
 
 
@@ -44,13 +44,12 @@ if uploaded_file is not None:
     limit_bottom = int(limit_bottom_slider*height)
 
     window = AttentionWindow(limit_left, limit_right, limit_top, limit_bottom)
-    window.makeItMultipleOf8()
 
     st.write("limit_left", window.left, "limit_right", window.right, "limit_top", window.top, "limit_bottom", window.bottom)
 
     # Processing
     start_time = time.time()
-    average_width, first_poly_model, second_poly_model, x, y = get_road_edges_from_eac(img, window, camHeight=cam_height_slider, kernel_width=kernel_slider, degree=degree_slider, debug=True)
+    average_width, first_poly_model, second_poly_model, x, y = compute_road_width_from_eac(img, window, camHeight=cam_height_slider, kernel_width=kernel_slider, degree=degree_slider, debug=True)
     end_time = time.time()
     st.write("Temps calcul (s)",round(end_time-start_time,2))
     st.write("Estimation (m)",round(average_width,2))
