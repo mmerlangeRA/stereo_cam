@@ -1,7 +1,7 @@
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
-from src.road_detection.main import AttentionWindow, get_road_edges_from_eac
+from src.road_detection.main import AttentionWindow, compute_road_width_from_eac
 
 
 if __name__ == '__main__':
@@ -26,7 +26,7 @@ if __name__ == '__main__':
     window = AttentionWindow(limit_left, limit_right, limit_top, limit_bottom)
 
     #processing
-    average_width,first_poly_model, second_poly_model,x,y = get_road_edges_from_eac(img,window,camHeight=1.65,degree=1,debug=True)
+    average_width,first_poly_model, second_poly_model,x,y = compute_road_width_from_eac(img,window,camHeight=1.65,degree=1,debug=True)
 
     # Generate y values for plotting the polynomial curves
     y_range = np.linspace(np.min(y), np.max(y), 500)
