@@ -73,15 +73,3 @@ def find_image_path(folder, image_name)->str:
             return os.path.join(root, image_name)
     return None
 
-
-
-def save_calibration_params(params:List[float], filename:str):
-    filename_csv = filename+'.csv'
-    calib_path =get_calibration_file_path(filename_csv)
-    np.savetxt(calib_path, params, delimiter=',')
-
-def load_calibration_params(filename:str)->List[float]:
-    filename_csv = filename+'.csv'
-    calib_path =get_calibration_file_path(filename_csv)
-    loaded =np.loadtxt(calib_path, delimiter=',')
-    return loaded

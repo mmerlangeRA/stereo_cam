@@ -1,3 +1,5 @@
+from bootstrap import set_paths
+set_paths()
 import argparse
 import json
 from python_server.components.triangulation_equipolar.main import AutoCalibrationRequest, TriangulationRequest, auto_calibrate_equipoloar, triangulate_equipolar_points

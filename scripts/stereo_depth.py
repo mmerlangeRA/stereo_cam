@@ -1,3 +1,5 @@
+from bootstrap import set_paths
+set_paths()
 import argparse
 import os
 import cv2

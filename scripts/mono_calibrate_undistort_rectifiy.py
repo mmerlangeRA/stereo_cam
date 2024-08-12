@@ -1,6 +1,7 @@
-import numpy as np
 import cv2
 import os
+from bootstrap import set_paths
+set_paths()
 from src.calibration.stereo_rectify import rectify_images
 from src.utils.path_utils import find_images_paths_in_folder, load_and_preprocess_cube_front_images
 from src.calibration.cube import compute_cube_calibration, read_calibration, save_calibration, undistort_and_crop

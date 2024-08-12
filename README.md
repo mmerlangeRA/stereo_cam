@@ -19,6 +19,7 @@ pyenv install 3.11
 pyenv local 3.11
 python3.11 -m venv venv
 source venv/bin/activate
+python bootstrap.py
 ```
 
 * installation des dépendances
@@ -77,6 +78,15 @@ Road segmentation
 python road_detection.py
 ```
 
+```bash
+python scripts/road_detection_stereo.py --img_left_path C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\13_rectified_left.jpg --img_right_path C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\13_rectified_right.jpg --calibration_path C:\Users\mmerl\projects\stereo_cam\calibration\stereodemo_calibration.json
+```
+
+```bash
+python scripts/road_detection_eac.py --img_path C:\Users\mmerl\projects\stereo_cam\Photos\P5\D_P5_CAM_G_0_EAC.png 
+```
+
+
 ## Lancement du serveur sur le port 8001
 
 ```bash
@@ -100,8 +110,17 @@ python -m python_server.scripts.extract_openapi python_server.main:app --out pyt
 
 Pour que cela fonctionne, il faut ajouter dans src/pretrained_models le dossier cityscapes disponible ici : <https://drive.google.com/drive/folders/1xDwOiH-Z0cOK_F6lvnykVyjry1s2njRS?usp=sharing>
 
+
+## Tests unitaires
+Dans le dossiers tests
+
+```bash
+python -m unittest discover -s tests
+```
+
 ## Docker installation
 
 to be done
 
 C:\Users\mmerl\anaconda3\envs\logiroadhitnet\python.exe -m streamlit run simple_app.py
+
