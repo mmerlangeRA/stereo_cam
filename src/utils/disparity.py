@@ -3,7 +3,7 @@ import numpy as np
 import numpy.typing as npt
 
 
-def compute_3d_position_from_disparity(x: float, y: float, disparity_map: npt.NDArray[np.float32], f: float, cx: float, cy: float, baseline: float) -> Tuple[List[float], float]:
+def compute_3d_position_from_disparity(x: float, y: float, disparity_map: npt.NDArray[np.float32], f: float, cx: float, cy: float, baseline: float,z0:float) -> Tuple[List[float], float]:
     """
     Compute the 3D position of a point in the disparity map.
 
@@ -20,11 +20,12 @@ def compute_3d_position_from_disparity(x: float, y: float, disparity_map: npt.ND
     """
     u = int(x)
     v = int(y)
+    
     disparity = disparity_map[v, u]
     if disparity <= 0:
         raise ValueError("Disparity must be positive and non-zero.")
 
-    Z = (f * baseline) / disparity
+    Z = (f * baseline) / (disparity + f*baseline/z0)
     X = ((u - cx) * Z) / f
     Y = ((v - cy) * Z) / f
 

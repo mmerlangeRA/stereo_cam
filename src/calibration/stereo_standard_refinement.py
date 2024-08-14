@@ -51,7 +51,6 @@ def compute_reprojection_residual(params:List[float],pts1, pts2, dist_coeffs:Lis
     residual = np.average(distances)
     return residual
 
-
 def compute_auto_calibration_for_2_stereo_standard_images(imgLeft:cv2.typing.MatLike, imgRight:cv2.typing.MatLike,verbose=True)-> Tuple[np.ndarray, float, np.ndarray, np.ndarray]:
     """
     Automatically calibrates a stereo camera setup using two standard images.

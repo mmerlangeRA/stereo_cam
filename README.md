@@ -75,7 +75,7 @@ python stereo_depth.py --restore_ckpt pretrained_models\middlebury_finetune.pth 
 Road segmentation
 
 ```bash
-python scripts/road_detection_stereo.py --img_left_path C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\11_rectified_left.jpg --img_right_path C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\11_rectified_right.jpg --calibration_path C:\Users\mmerl\projects\stereo_cam\calibration\stereodemo_calibration.json
+python scripts/road_detection_stereo.py --img_left_path C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\11_rectified_left.jpg --img_right_path C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\11_rectified_right.jpg --calibration_path C:\Users\mmerl\projects\stereo_cam\calibration\calibration_640.json
 ```
 
 ```bash
