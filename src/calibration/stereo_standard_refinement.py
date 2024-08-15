@@ -28,7 +28,7 @@ def compute_reprojection_residual(params:List[float],pts1, pts2, dist_coeffs:Lis
     cx= params[2]
     cy= params[3]
     K = np.array([[fx, 0, cx],
-            [0, fx, cy],
+            [0, fy, cy],
             [0, 0, 1]])
     P1 = K @ np.hstack((np.eye(3), np.zeros((3, 1))))
 
@@ -107,7 +107,6 @@ def compute_auto_calibration_for_2_stereo_standard_images(imgLeft:cv2.typing.Mat
     h, w = images[0].shape[:2]
 
     # Initial guess 
-    focal_length_init = 700.0   #in pixels
     fx_init = fy_init= 700.0   #in pixels
     cx_init = w/2
     cy_init = h/2
@@ -121,7 +120,7 @@ def compute_auto_calibration_for_2_stereo_standard_images(imgLeft:cv2.typing.Mat
             [2000,2000, w/1.5, h/1.5,0.1,0.1,0.1,-1.11,0.03,0.03])
 
     # Perform bundle adjustment
-    result = least_squares(compute_reprojection_residual, initial_params, args=(pts1,pts2, np.zeros(5)), bounds=bounds)
+    result = least_squares(compute_reprojection_residual, initial_params, args=(pts1,pts2, np.zeros(5)), bounds=bounds, loss='huber')
     refined_params = result.x
     
     refined_params= result.x

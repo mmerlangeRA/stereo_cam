@@ -15,13 +15,16 @@ from src.utils.disparity import compute_3d_position_from_disparity
 from src.utils.coordinate_transforms import pixel_to_spherical, spherical_to_cartesian
 from src.road_detection.RoadSegmentator import RoadSegmentator
 from src.road_detection.common import AttentionWindow
+from src.calibration.StereoCalibrator import StereoFullCalibration
 
 
 class RoadDetector:
     roadSegmentator : RoadSegmentator
+    window:AttentionWindow
     degree:int
-    def __init__(self,roadSegmentator : RoadSegmentator, degree=1,debug=False):
+    def __init__(self,roadSegmentator : RoadSegmentator,window:AttentionWindow, degree=1,debug=False):
         self.roadSegmentator = roadSegmentator
+        self.window = window
         self.degree = degree
         self.debug = debug
         
@@ -38,12 +41,10 @@ class EACRoadDetector(RoadDetector):
     - degree : degree of the polynom for curve fitting
     """
     img: npt.NDArray[np.uint8]
-    window:AttentionWindow
     camHeight=2.
 
     def __init__(self, roadSegmentator: RoadSegmentator, window:AttentionWindow, camHeight=2.,degree=1,debug=False):
-        super().__init__(roadSegmentator, degree,debug)
-        self.window = window
+        super().__init__(roadSegmentator, window=window,degree=degree,debug=debug)
         self.camHeight = camHeight
         
 
@@ -120,17 +121,18 @@ class EACRoadDetector(RoadDetector):
         return np.mean(distances),first_poly_model, second_poly_model,contour_x,contour_y    
 
 class StereoRoadDetector(RoadDetector):
-    calibration:Calibration
-    def __init__(self, roadSegmentator: RoadSegmentator, calibration:Calibration,debug=False):
-        super().__init__(roadSegmentator, debug)
+    calibration:StereoFullCalibration
+    def __init__(self, roadSegmentator: RoadSegmentator, window:AttentionWindow,calibration:StereoFullCalibration,degree=1,debug=False):
+        super().__init__(roadSegmentator,window=window, degree=degree,debug=debug)
         self.calibration = calibration
 
 
-    def compute_road_width(self,img: npt.NDArray[np.uint8]) :
+    def compute_road_width(self,img_left_right: npt.NDArray[np.uint8]) :
         """
         img is split into 2 left and right images
         """
-        height, width = img.shape[:2]
+
+        height, width = img_left_right.shape[:2]
         # Ensure the width is even so that it can be evenly split into two halves
         assert width % 2 == 0, "Image width is not even. Cannot split into two equal halves."
 
@@ -138,21 +140,31 @@ class StereoRoadDetector(RoadDetector):
         middle = width // 2
 
         # Split the image into left and right halves
-        imgL = img[:, :middle]
-        imgR = img[:, middle:]
+        imgL = img_left_right[:, :middle]
+        imgR = img_left_right[:, middle:]
 
         test_igev = Selective_igev(None, None)
         input_pair = InputPair(left_image=imgL, right_image=imgR, status="started", calibration=self.calibration)
         stereo_output = test_igev.compute_disparity(input_pair)
         disparity_map = stereo_output.disparity_pixels
 
-        focal_length = self.calibration.fx
-        baseline = self.calibration.baseline_meters
-        c_x = self.calibration.cx0
-        c_y = self.calibration.cy
-        z0= self.calibration.z0
+        K = self.calibration.stereo_rectified_K
 
-        thresh = self.roadSegmentator.segment_road_image(imgL)
+        fx = K[0][0]
+        fy = K[1][1]
+        baseline = self.calibration.stereo_rectified_tvec[0][0]
+        c_x = K[0][2]
+        c_y = K[1][2]
+        z0= self.calibration.stereo_rectified_Z0
+
+        windowed = self.window.crop_image(imgL)
+
+        if self.debug:
+            cv2.imwrite(get_static_folder_path("windowed.png"), windowed)
+        thresh_windowed = self.roadSegmentator.segment_road_image(windowed)
+        thresh = np.zeros(imgL.shape[:2], dtype=np.uint8)
+
+        thresh[self.window.top:self.window.bottom, self.window.left:self.window.right] = thresh_windowed
         contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         
         if len(contours) == 0:
@@ -181,8 +193,8 @@ class StereoRoadDetector(RoadDetector):
         for y in range(minY +0, maxY - 0):
             x_first_poly = first_poly_model.predict([[y]])[0]
             x_second_poly = second_poly_model.predict([[y]])[0]
-            p1, d1 = compute_3d_position_from_disparity(x_first_poly, y, disparity_map, focal_length, c_x, c_y, baseline,z0)
-            p2, d2 = compute_3d_position_from_disparity(x_second_poly, y, disparity_map, focal_length, c_x, c_y, baseline,z0)
+            p1, d1 = compute_3d_position_from_disparity(x_first_poly, y, disparity_map, fx, fy,c_x, c_y, baseline,z0)
+            p2, d2 = compute_3d_position_from_disparity(x_second_poly, y, disparity_map, fx, fy,c_x, c_y, baseline,z0)
             # if np.abs(d2 - d1) > 10:
             #     print(d2, d1)
             points.append([p1, p2])

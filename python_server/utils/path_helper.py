@@ -45,13 +45,6 @@ def get_tmp_static_folder()->str:
         os.makedirs(tmp_folder)
     return tmp_folder
 
-
-def get_calibration_file_path(filename:str)->str:
-    calibration_folder = os.path.join(os.getcwd(), 'calibration')
-    if not os.path.exists(calibration_folder):
-        os.makedirs(calibration_folder)
-    return os.path.join(calibration_folder,filename)
-
 def get_image_paths(folder):
     print("folder", folder)
     # Define the image file extensions you want to include

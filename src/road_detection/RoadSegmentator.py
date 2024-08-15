@@ -1,14 +1,13 @@
 from abc import abstractmethod
 import time
 import cv2
-from matplotlib import pyplot as plt
 import numpy as np
 import torch
 from src.pidnet.main import segment_image
 from src.utils.path_utils import get_static_folder_path
 from typing import Tuple, List, Optional
 import numpy.typing as npt
-from src.road_detection.seg_former import SegFormerEvaluater, seg_segment_image
+from src.road_detection.seg_former import SegFormerEvaluater
 
 class RoadSegmentator:
     kernel_width: int

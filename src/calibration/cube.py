@@ -29,7 +29,7 @@ def read_calibration(fname="calibration_matrix.yaml")->np.ndarray[float]:
     return np.asarray(data['camera_matrix']), np.asarray(data['dist_coeff']),data['rmse']
 
 
-def compute_cube_calibration(image_paths:List[str],chessboard_size:cv2.typing.Size,square_size:float, verbose=False)->tuple[float,cv2.typing.MatLike, cv2.typing.MatLike]:
+def compute_cube_calibration(image_paths:List[str],chessboard_size:cv2.typing.Size,square_size:float, verbose=False)->tuple[cv2.typing.MatLike, cv2.typing.MatLike,float]:
     nb_used = 0
     objpoints=[]
     imgpoints=[]
