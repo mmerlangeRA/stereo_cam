@@ -3,6 +3,7 @@ import json
 import os
 from typing import List, Tuple
 import cv2
+from matplotlib import pyplot as plt
 import numpy as np
 import yaml
 from src.features_2d.utils import detectAndComputeKPandDescriptors
@@ -11,7 +12,8 @@ from scipy.optimize import least_squares
 from src.calibration.cube import compute_cube_calibration, undistort_and_crop
 from src.calibration.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
 from src.utils.cube_image import get_cube_front_image
-from src.utils.path_utils import get_calibration_folder_path
+from src.utils.path_utils import get_calibration_folder_path, get_static_folder_path
+from src.utils.coordinate_transforms import get_extrinsic_matrix_from_rvec_tvec, get_identity_extrinsic_matrix, get_transformation_matrix, invert_rvec_tvec
 
 @dataclass
 class StereoFullCalibration:
@@ -21,6 +23,7 @@ class StereoFullCalibration:
     mono_dist: cv2.typing.MatLike = field(default_factory=lambda: np.array([]))
     mono_ret: float =-1.
     
+    # be careful, rotation and translation are the ones needed to transform coordinates in cam1 (world) to cam2
     stereo_undistorted_img_width:int = -1
     stereo_undistorted_img_height:int = -1
     stereo_undistorted_K:np.ndarray = field(default_factory=lambda: np.array([]))
@@ -57,8 +60,8 @@ def compute_reprojection_residual(params:List[float],pts1, pts2, dist_coeffs:Lis
 
     Args:
         params (np.ndarray): Array containing camera parameters (fx, fy, cx, cy, rvec, tvec).
-        pts1 (np.ndarray): Array of points from the first image.
-        pts2 (np.ndarray): Array of points from the second image.
+        pts1 (np.ndarray): Array of points from the left image.
+        pts2 (np.ndarray): Array of points from the right image.
         K (np.ndarray): Camera matrix.
         dist_coeffs (np.ndarray): Distortion coefficients.
 
@@ -75,14 +78,14 @@ def compute_reprojection_residual(params:List[float],pts1, pts2, dist_coeffs:Lis
     cx= params[2]
     cy= params[3]
     K = np.array([[fx, 0, cx],
-            [0, fx, cy],
+            [0, fy, cy],
             [0, 0, 1]])
     P1 = K @ np.hstack((np.eye(3), np.zeros((3, 1))))
 
-    rvec = params[4:7].reshape(3, 1)
-    tvec = params[7:10].reshape(3, 1)
-    R, _ = cv2.Rodrigues(rvec)
-    P2 = K @ np.hstack((R, tvec))
+    rvec_1_to_2 = params[4:7].reshape(3, 1)
+    tvec_1_to_2 = params[7:10].reshape(3, 1)
+    R, _ = cv2.Rodrigues(rvec_1_to_2)
+    P2 = K @ np.hstack((R, tvec_1_to_2))
 
     # Triangulate points
     points_4d = cv2.triangulatePoints(P1, P2, pts1, pts2)
@@ -90,22 +93,26 @@ def compute_reprojection_residual(params:List[float],pts1, pts2, dist_coeffs:Lis
     points_3d = points_4d[:3] / points_4d[3]
     points_3d = points_3d.T
 
-    projected_points, _ = cv2.projectPoints(points_3d, rvec, tvec, K, dist_coeffs)
+    # projected_points, _ = cv2.projectPoints(points_3d, rvec, tvec, K, dist_coeffs)
+    # projected_points = projected_points.reshape(-1, 2)
+    # distances = np.linalg.norm(pts2.reshape(-1, 2) - projected_points, axis=1)
+
+    projected_points, _ = cv2.projectPoints(points_3d, rvec_1_to_2, tvec_1_to_2, K, dist_coeffs)
     projected_points = projected_points.reshape(-1, 2)
     distances = np.linalg.norm(pts2.reshape(-1, 2) - projected_points, axis=1)
 
-    distances= distances[distances<30]
-    residual = np.average(distances)
-    return residual
+    #distances= distances[distances<30]#avoid inliers ?
+    #residual = np.average(distances)
+    print(np.average(distances))
+    return distances
+    return np.average(distances)
 
 class StereoCalibrator:
     verbose: bool
     calibration: StereoFullCalibration
-
     calibration_file_name : str
     calibration_file_path :str
     estimated_base_line_in_m:float #along x
-
 
     def __init__(self,estimated_base_line_in_m=1.12,calibration_file_name="calibration_matrix.json",verbose=False) -> None:
         self.estimated_base_line_in_m = estimated_base_line_in_m
@@ -127,10 +134,14 @@ class StereoCalibrator:
         if os.path.exists(self.calibration_file_path)==False: 
             raise FileNotFoundError(f"Calibration file not found at {self.calibration_file_path}")
 
-        self.calibration = StereoFullCalibration.from_json (open(self.calibration_path, 'r').read())
- 
+        self.calibration = StereoFullCalibration.from_json (open(self.calibration_file_path, 'r').read())
+        if(len(self.calibration.stereo_rectified_tvec)>0):
+            self.estimated_base_line_in_m = -self.calibration.stereo_rectified_tvec[0][0]
 
     def compute_mono_chessboard_calibration(self, image_paths:List[str],chessboard_size:cv2.typing.Size,square_size:float)->tuple[float,cv2.typing.MatLike, cv2.typing.MatLike]:
+        """
+        Compute calibration for monocular chessboard images.
+        """
         self.calibration.mono_K, self.calibration.mono_dist,self.calibration.mono_ret = compute_cube_calibration(image_paths=image_paths, chessboard_size=chessboard_size, square_size=square_size, verbose=self.verbose)
         img = cv2.imread(image_paths[0])
         front_image=get_cube_front_image(img)
@@ -196,7 +207,8 @@ class StereoCalibrator:
             if self.verbose:
                 # Draw matches
                 img_matches = cv2.drawMatches(imgLeft, keypoints_list[0], imgRight, keypoints_list[1], matches[:50], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-                cv2.imwrite(f'img_matches_{i}.png', img_matches)
+                save_path = get_static_folder_path(f'img_matches_{i}.png')
+                cv2.imwrite(save_path, img_matches)
 
             # Extract matched keypoints
             pts1 = np.float32([keypoints_list[0][m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
@@ -228,15 +240,18 @@ class StereoCalibrator:
             fx_init = fy_init = 700.0   # in pixels
             cx_init = w / 2
             cy_init = h / 2
+
+            #These are rvec and tvec to pass from cam1 (world) to cam2 referential. Thus negative value for tvec x
             rvec_init = np.array([[-0.0], [0.0], [-0.0]], dtype=np.float32)
             tvec_init = np.array([[-self.estimated_base_line_in_m], [0.0], [0.0]], dtype=np.float32)
-            tvec_init = np.array([[self.estimated_base_line_in_m], [0.0], [0.0]], dtype=np.float32)
 
             # Initial parameter guess (focal length and principal point)
             initial_params = np.hstack(([fx_init], [fy_init], [cx_init], [cy_init], rvec_init.ravel(), tvec_init.ravel()))
+            max_translation_error = 0.03 # 2 cm
+            max_rotation_error = 6*np.pi/180 # 5 degree
             bounds = (
-                [100, 100, w / 2.5, h / 2.5, -0.1, -0.1, -0.1, -1.13, -0.03, -0.03],
-                [2000, 2000, w / 1.5, h / 1.5, 0.1, 0.1, 0.1, -1.11, 0.03, 0.03]
+                [fx_init*0.9, fy_init*0.9, w / 2.5, h / 2.5, -max_rotation_error, -max_rotation_error, -max_rotation_error, -self.estimated_base_line_in_m - max_translation_error, -max_translation_error, -max_translation_error],
+                [fx_init*1.1, fy_init*1.1, w / 1.5, h / 1.5, max_rotation_error, max_rotation_error, max_rotation_error, -self.estimated_base_line_in_m +max_translation_error, max_translation_error, max_translation_error]
             )
 
             # Perform bundle adjustment on all points
@@ -248,7 +263,7 @@ class StereoCalibrator:
             refined_cx, refined_cy = refined_params[2], refined_params[3]
             refined_rvec = refined_params[4:7].reshape(3, 1)
             refined_tvec = refined_params[7:10].reshape(3, 1)
-            self.estimated_base_line_in_m = refined_tvec[0][0]
+            self.estimated_base_line_in_m = -refined_tvec[0][0]
 
             # Update the camera matrix with the refined focal length and principal point
             K = np.array([[refined_fx, 0, refined_cx],
@@ -261,10 +276,11 @@ class StereoCalibrator:
                 print(f"Refined Rotation Vector:\n{refined_rvec}")
                 print(f"Refined Translation Vector:\n{refined_tvec}")
                 print(f"Updated Camera Matrix:\n{K}")
-                print(f"Final Reprojection Error Cost: {result.cost:.6f}")
+                print(f"Final Reprojection Error Cost: {result.cost/len(all_pts1):.6f}")
+                print(f"Optimality{result.optimality}")
 
             
-            return K, float(result.cost), refined_rvec, refined_tvec
+            return K, float(result.cost/len(all_pts1)), refined_rvec, refined_tvec
     
     def compute_global_auto_calibration_undistorted(self,image_paths_left: List[str], 
                                         image_paths_right: List[str]) -> Tuple[np.ndarray, float, np.ndarray, np.ndarray]:
@@ -290,8 +306,9 @@ class StereoCalibrator:
         return  K, cost, refined_rvec, refined_tvec
         
     def compute_stereo_rectified_Z0(self):
-        half_rot_y = self.calibration.stereo_rectified_rvec[1][0]/2.
-        half_baseline = self.calibration.stereo_rectified_tvec[0][0]/2.
+        rvec_inv, tvec_inv = invert_rvec_tvec(self.calibration.stereo_rectified_rvec, self.calibration.stereo_rectified_tvec)
+        half_rot_y = rvec_inv[1][0]/2.
+        half_baseline = self.estimated_base_line_in_m/2.
         self.calibration.stereo_rectified_Z0 = half_baseline * np.tan(np.pi/2.-half_rot_y)
         print(type(self.calibration.stereo_rectified_Z0))
     
@@ -299,6 +316,69 @@ class StereoCalibrator:
        
        return compute_auto_calibration_for_2_stereo_standard_images(imgLeft, imgRight, verbose)
   
+    
+    def rectifyUncalibrated(self, dst1:cv2.typing.MatLike,dst2:cv2.typing.MatLike):
+        #Computation of the fundamental matrix
+
+        ###find the keypoints and descriptors with SIFT
+        kp1, des1 = detectAndComputeKPandDescriptors(dst1)
+        kp2, des2 = detectAndComputeKPandDescriptors(dst2)
+
+        ###FLANN parameters
+        FLANN_INDEX_KDTREE = 0
+        index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+        search_params = dict(checks=50)
+
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+            # Match descriptors between the two images
+        matches = bf.match(des1, des2)
+
+        good = []
+        pts1 = []
+        pts2 = []
+
+        ###ratio test as per Lowe's paper
+        for m in matches:
+            good.append(m)
+            pts2.append(kp2[m.trainIdx].pt)
+            pts1.append(kp1[m.queryIdx].pt)
+            
+            
+        pts1 = np.array(pts1)
+        pts2 = np.array(pts2)
+        F,mask= cv2.findFundamentalMat(pts1,pts2,cv2.FM_LMEDS)
+
+        # Obtainment of the rectification matrix and use of the warpPerspective to transform them...
+        pts1 = pts1[:,:][mask.ravel()==1]
+        pts2 = pts2[:,:][mask.ravel()==1]
+
+        pts1 = np.int32(pts1)
+        pts2 = np.int32(pts2)
+
+        p1fNew = pts1.reshape((pts1.shape[0] * 2, 1))
+        p2fNew = pts2.reshape((pts2.shape[0] * 2, 1))
+
+        size = dst1.shape[:2]
+            
+        retBool ,rectmat1, rectmat2 = cv2.stereoRectifyUncalibrated(pts1,pts2,F,size)
+
+        dst11 = cv2.warpPerspective(dst1,rectmat1,size)
+        dst22 = cv2.warpPerspective(dst2,rectmat2,size)
+        cv2.imwrite(get_static_folder_path("gauche.png"), dst11)
+        cv2.imwrite(get_static_folder_path("droite.png"), dst22)
+
+
+        #calculation of the disparity
+        # stereo = cv2.StereoBM(cv2.STEREO_BM_BASIC_PRESET,ndisparities=16*10, SADWindowSize=9)
+        # disp = stereo.compute(dst22.astype(np.uint8), dst11.astype(np.uint8)).astype(np.float32)
+        # plt.imshow(disp);plt.colorbar();plt.clim(0,400)#;plt.show()
+        # plt.savefig("0gauche.png")
+
+        #plot depth by using disparity focal length `C1[0,0]` from stereo calibration and `T[0]` the distance between cameras
+
+        #plt.imshow(C1[0,0]*T[0]/(disp),cmap='hot');plt.clim(-0,500);plt.colorbar();plt.show()
+        
     def rectify_undistorted_images(self,undistorted_left:cv2.typing.MatLike,undistorted_right:cv2.typing.MatLike)-> tuple[cv2.typing.MatLike,cv2.typing.MatLike]:
         """
         Rectify already undistorted images
@@ -308,39 +388,35 @@ class StereoCalibrator:
         
         K = self.calibration.stereo_undistorted_K
 
-        A1 = K # Left camera matrix intrinsic
-        A2 = K # Right camera matrix intrinsic
-        
-        RT1 = np.eye(3, 4)
+        K1 = K # Left camera matrix intrinsic
+        K2 = K # Right camera matrix intrinsic
 
         rvec=self.calibration.stereo_undistorted_rvec
         tvec=self.calibration.stereo_undistorted_tvec
 
-        # Convert the rotation vector to a rotation matrix
-        R, _ = cv2.Rodrigues(rvec)
-        
-        # Create the 3x4 extrinsic matrix by combining R and tvec
-        RT2 = np.hstack((R, tvec))
-        
-        # Original projection matrices
-        Po1 = A1.dot( RT1 )
-        Po2 = A2.dot( RT2 )
+        R1to2,_ =cv2.Rodrigues(rvec)
+        T1to2 = tvec.flatten()
+
+        """
+        RT1 = get_identity_extrinsic_matrix()
+        RT2 = get_extrinsic_matrix_from_rvec_tvec(rvec=rvec,tvec=tvec)
+        Po1 = K1.dot( RT1 )
+        Po2 = K2.dot( RT2 )
 
         # Camera centers (world coord.)
         C1 = -np.linalg.inv(Po1[:,:3]).dot(Po1[:,3])
         C2 = -np.linalg.inv(Po2[:,:3]).dot(Po2[:,3])
-
-        # Transformations
-        T1to2 = C2 - C1 # Translation from first to second camera
+        T1to2 = C2 - C1
         R1to2 = RT2[:,:3].dot(np.linalg.inv(RT1[:,:3])) # Rotation from first to second camera (3x3)
-
-        R1, R2, Pn1, Pn2, _, _, _ = cv2.stereoRectify(A1, np.zeros((1,5)), A2, np.zeros((1,5)), (undistorted_left.shape[1], undistorted_right.shape[0]), R1to2, T1to2, alpha=-1 )
+        """
+        
+        R1, R2, Pn1, Pn2, _, _, _ = cv2.stereoRectify(K1, np.zeros((1,5)), K2, np.zeros((1,5)), (undistorted_left.shape[1], undistorted_right.shape[0]), R1to2, T1to2, alpha=-1 )
 
         # Rectify1 = R1.dot(np.linalg.inv(A1))
         # Rectify2 = R2.dot(np.linalg.inv(A2))
 
-        mapL1, mapL2 = cv2.initUndistortRectifyMap(A1, np.zeros((1,5)), R1, Pn1, (undistorted_left.shape[1], undistorted_left.shape[0]), cv2.CV_32FC1)
-        mapR1, mapR2 = cv2.initUndistortRectifyMap(A2, np.zeros((1,5)), R2, Pn2, (undistorted_right.shape[1], undistorted_right.shape[0]), cv2.CV_32FC1)
+        mapL1, mapL2 = cv2.initUndistortRectifyMap(K1, np.zeros((1,5)), R1, Pn1, (undistorted_left.shape[1], undistorted_left.shape[0]), cv2.CV_32FC1)
+        mapR1, mapR2 = cv2.initUndistortRectifyMap(K2, np.zeros((1,5)), R2, Pn2, (undistorted_right.shape[1], undistorted_right.shape[0]), cv2.CV_32FC1)
 
         img1_rect = cv2.remap(undistorted_left, mapL1, mapL2, cv2.INTER_LINEAR)
         img2_rect = cv2.remap(undistorted_right, mapR1, mapR2, cv2.INTER_LINEAR)

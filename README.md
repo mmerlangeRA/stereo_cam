@@ -78,6 +78,9 @@ Road segmentation
 python scripts/road_detection_stereo.py --img_left_path C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\11_rectified_left.jpg --img_right_path C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\11_rectified_right.jpg --calibration_path C:\Users\mmerl\projects\stereo_cam\calibration\calibrator_matrix.json
 ```
 
+python scripts/road_detection_stereo.py --img_left_path C:\Users\mmerl\projects\stereo_cam\static\gauche.png --img_right_path C:\Users\mmerl\projects\stereo_cam\static\droite.png --calibration_path C:\Users\mmerl\projects\stereo_cam\calibration\calibrator_matrix.json
+"C:\Users\mmerl\projects\stereo_cam\static\gauche.png"
+
 ```bash
 python scripts/road_detection_eac.py --img_path C:\Users\mmerl\projects\stereo_cam\Photos\P5\D_P5_CAM_G_0_EAC.png 
 ```

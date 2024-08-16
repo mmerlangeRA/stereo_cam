@@ -11,15 +11,12 @@ chessboard_size = (9,6)
 square_size = 0.025
 
 calibrator = StereoCalibrator(verbose=True, estimated_base_line_in_m=1.12,calibration_file_name="calibrator_matrix.json")
-
-calibrator.reset()
-
+#calibrator.reset()
 
 #Path to calibration matrix
 calibration_path=calibrator.calibration_file_path
 mono_calibration_cube_photo_folder = r"C:\Users\mmerl\projects\stereo_cam\Calibrate_CUBE"
 stereo_images_folder= r'C:\Users\mmerl\projects\stereo_cam\Photos'
-
 
 folder_name = "undistorted_CUBE"
 folder_path_for_undistorted = os.path.join(os.getcwd(),folder_name)
@@ -31,6 +28,11 @@ if not os.path.exists(folder_path_for_undistorted):
 #get or compute calibration matrix or one camera
 if os.path.exists(calibration_path):
     calibrator.read_calibration()
+    imgL_path = r'C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\11_left.png'
+    imgR_path = r'C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\11_right.png'
+    imgL = cv2.imread(imgL_path,cv2.IMREAD_COLOR)
+    imgR = cv2.imread(imgR_path,cv2.IMREAD_COLOR)
+    calibrator.rectifyUncalibrated(imgL,imgR)
     calibrator.compute_stereo_rectified_Z0()
 else:
     image_paths = find_images_paths_in_folder(mono_calibration_cube_photo_folder)
@@ -63,6 +65,8 @@ for i in range(nb_pairs):
     right_img_paths.append(undistorted_right_path)
 calibrator.compute_global_auto_calibration_undistorted(left_img_paths, right_img_paths)
 calibrator.save_calibration()
+
+
 
 rectified_left_img_paths = []
 rectified_right_img_paths = []

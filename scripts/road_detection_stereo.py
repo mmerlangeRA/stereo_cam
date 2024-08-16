@@ -46,7 +46,7 @@ if __name__ == '__main__':
     calibration_path = args.calibration_path
     calibration = StereoFullCalibration.from_json (open(calibration_path, 'r').read())
    
-
+    
     #cv2.imshow('imgL', imgL)
     #cv2.imshow('imgR', imgR)
     img = np.hstack((imgL, imgR))

@@ -131,7 +131,7 @@ class StereoRoadDetector(RoadDetector):
         """
         img is split into 2 left and right images
         """
-
+        cv2.imshow("img_left_right",img_left_right)
         height, width = img_left_right.shape[:2]
         # Ensure the width is even so that it can be evenly split into two halves
         assert width % 2 == 0, "Image width is not even. Cannot split into two equal halves."
@@ -141,6 +141,8 @@ class StereoRoadDetector(RoadDetector):
 
         # Split the image into left and right halves
         imgL = img_left_right[:, :middle]
+        cv2.imshow("imgL",imgL)
+        cv2.waitKey(0)
         imgR = img_left_right[:, middle:]
 
         test_igev = Selective_igev(None, None)
@@ -152,10 +154,12 @@ class StereoRoadDetector(RoadDetector):
 
         fx = K[0][0]
         fy = K[1][1]
-        baseline = self.calibration.stereo_rectified_tvec[0][0]
+        baseline = -self.calibration.stereo_rectified_tvec[0][0]
+        print("baseline",baseline)
         c_x = K[0][2]
         c_y = K[1][2]
         z0= self.calibration.stereo_rectified_Z0
+        print("z0", z0) 
 
         windowed = self.window.crop_image(imgL)
 
@@ -190,15 +194,18 @@ class StereoRoadDetector(RoadDetector):
         distances = []
         points = []
 
-        for y in range(minY +0, maxY - 0):
+        for y in range(minY, maxY):
             x_first_poly = first_poly_model.predict([[y]])[0]
             x_second_poly = second_poly_model.predict([[y]])[0]
             p1, d1 = compute_3d_position_from_disparity(x_first_poly, y, disparity_map, fx, fy,c_x, c_y, baseline,z0)
             p2, d2 = compute_3d_position_from_disparity(x_second_poly, y, disparity_map, fx, fy,c_x, c_y, baseline,z0)
             # if np.abs(d2 - d1) > 10:
             #     print(d2, d1)
-            points.append([p1, p2])
+
             distances.append(np.linalg.norm(np.array(p1) - np.array(p2)))
+            p1=np.round(p1,2)
+            p2=np.round(p2, 2)
+            points.append([p1, p2])
         
         if self.debug:
             print(f'found {len(contours)}')
@@ -211,6 +218,7 @@ class StereoRoadDetector(RoadDetector):
                 cv2.drawContours(contour_image, [contour], -1, color, 3)
             print(np.mean(distances))
             print(points)
+            distances = [np.round(d,1) for d in distances]
             print(distances)
             
             cv2.imshow('contours', contour_image)
