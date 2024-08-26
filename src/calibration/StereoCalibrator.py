@@ -5,7 +5,6 @@ from typing import List, Tuple
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
-import yaml
 from src.features_2d.utils import detectAndComputeKPandDescriptors
 from scipy.optimize import least_squares
 
@@ -149,6 +148,50 @@ class StereoCalibrator:
         self.calibration.mono_img_width=width
         self.calibration.mono_img_height=height
         return self.calibration.mono_K, self.calibration.mono_dist,self.calibration.mono_ret
+    
+    def compute_stereo_chessboard_calibration(self, image_paths_left: List[str], image_paths_right: List[str], chessboard_size:cv2.typing.Size, square_size:float)->None:
+        """
+        Compute calibration for stereo chessboard images. Not finished/tested
+        """
+        # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+        objp = np.zeros((chessboard_size[0] * chessboard_size[1], 3), np.float32)
+        objp[:,:2] = np.mgrid[0:chessboard_size[0],0:chessboard_size[1]].T.reshape(-1,2)
+        # Here we fix the intrinsic camara matrixes so that only Rot, Trns, Emat and Fmat are calculated.
+        # Hence intrinsic parameters are the same 
+        flags = 0
+        flags |= cv2.CALIB_FIX_INTRINSIC
+        
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+        criteria_stereo= (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+        # Arrays to store object points and image points from all the images.
+        objpoints = [] # 3d point in real world space
+        imgpointsL = [] # 2d points in image plane.
+        imgpointsR = [] # 2d points in image plane.
+        for i in range(0, len(image_paths_left)):
+            imgLeft, imgRight = image_paths_left[i], image_paths_right[i]
+            imgL = cv2.imread(imgLeft)
+            imgR = cv2.imread(imgRight)
+            grayL = cv2.cvtColor(imgL, cv2.COLOR_BGR2GRAY)
+            grayR = cv2.cvtColor(imgR, cv2.COLOR_BGR2GRAY)
+
+            # Find the chess board corners
+            retL, cornersL = cv2.findChessboardCorners(grayL, chessboard_size, None)
+            retR, cornersR = cv2.findChessboardCorners(grayR, chessboard_size, None)
+
+            # If found, add object points, image points (after refining them)
+            if retL and retR == True:
+
+                objpoints.append(objp)
+
+                cornersL = cv2.cornerSubPix(grayL, cornersL, (11,11), (-1,-1), criteria)
+                imgpointsL.append(cornersL)
+
+                cornersR = cv2.cornerSubPix(grayR, cornersR, (11,11), (-1,-1), criteria)
+                imgpointsR.append(cornersR)
+
+        # This step is performed to transformation between the two cameras and calculate Essential and Fundamenatl matrix
+        retStereo, newCameraMatrixL, distL, newCameraMatrixR, distR, rot, trans, essentialMatrix, fundamentalMatrix = cv2.stereoCalibrate(objpoints, imgpointsL, imgpointsR, newCameraMatrixL, distL, newCameraMatrixR, distR, grayL.shape[::-1], criteria_stereo, flags)
+
     
     def undistort_and_crop(self,leftImg)-> tuple[cv2.typing.MatLike,cv2.typing.MatLike]:
         undistorted_left,newcameramtx = undistort_and_crop(leftImg, self.calibration.mono_K, self.calibration.mono_dist)
@@ -397,26 +440,16 @@ class StereoCalibrator:
         R1to2,_ =cv2.Rodrigues(rvec)
         T1to2 = tvec.flatten()
 
-        """
-        RT1 = get_identity_extrinsic_matrix()
-        RT2 = get_extrinsic_matrix_from_rvec_tvec(rvec=rvec,tvec=tvec)
-        Po1 = K1.dot( RT1 )
-        Po2 = K2.dot( RT2 )
+        distCoeffs1 = distCoeffs2 = np.zeros((1,5))
+        undistorted_shape = (undistorted_left.shape[1], undistorted_right.shape[0])
 
-        # Camera centers (world coord.)
-        C1 = -np.linalg.inv(Po1[:,:3]).dot(Po1[:,3])
-        C2 = -np.linalg.inv(Po2[:,:3]).dot(Po2[:,3])
-        T1to2 = C2 - C1
-        R1to2 = RT2[:,:3].dot(np.linalg.inv(RT1[:,:3])) # Rotation from first to second camera (3x3)
-        """
-        
-        R1, R2, Pn1, Pn2, _, _, _ = cv2.stereoRectify(K1, np.zeros((1,5)), K2, np.zeros((1,5)), (undistorted_left.shape[1], undistorted_right.shape[0]), R1to2, T1to2, alpha=-1 )
+        R1, R2, Pn1, Pn2, _, _, _ = cv2.stereoRectify(K1, distCoeffs1, K2, distCoeffs2,undistorted_shape, R1to2, T1to2, alpha=-1 )
 
         # Rectify1 = R1.dot(np.linalg.inv(A1))
         # Rectify2 = R2.dot(np.linalg.inv(A2))
 
-        mapL1, mapL2 = cv2.initUndistortRectifyMap(K1, np.zeros((1,5)), R1, Pn1, (undistorted_left.shape[1], undistorted_left.shape[0]), cv2.CV_32FC1)
-        mapR1, mapR2 = cv2.initUndistortRectifyMap(K2, np.zeros((1,5)), R2, Pn2, (undistorted_right.shape[1], undistorted_right.shape[0]), cv2.CV_32FC1)
+        mapL1, mapL2 = cv2.initUndistortRectifyMap(K1, distCoeffs1, R1, Pn1, undistorted_shape, cv2.CV_32FC1)
+        mapR1, mapR2 = cv2.initUndistortRectifyMap(K2, distCoeffs2, R2, Pn2, undistorted_shape, cv2.CV_32FC1)
 
         img1_rect = cv2.remap(undistorted_left, mapL1, mapL2, cv2.INTER_LINEAR)
         img2_rect = cv2.remap(undistorted_right, mapR1, mapR2, cv2.INTER_LINEAR)

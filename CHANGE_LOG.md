@@ -4,3 +4,4 @@
 * LOG-2 : code refactoring
 * LOG-3 : added 2 road width estimations
 * LOG-4 : added first unit tests
+* Added simple streamit app

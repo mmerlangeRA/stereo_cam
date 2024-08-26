@@ -87,19 +87,16 @@ python scripts/road_detection_stereo.py --img_left_path C:\Users\mmerl\projects\
 python scripts/road_detection_stereo.py --img_left_path C:\Users\mmerl\projects\stereo_cam\static\gauche.png --img_right_path C:\Users\mmerl\projects\stereo_cam\static\droite.png --calibration_path C:\Users\mmerl\projects\stereo_cam\calibration\calibrator_matrix.json
 "C:\Users\mmerl\projects\stereo_cam\static\gauche.png"
 
-
 EAC
 
 ```bash
 python scripts/road_detection_eac.py --img_path C:\Users\mmerl\projects\stereo_cam\Photos\P5\D_P5_CAM_G_0_EAC.png 
 ```
 
-
 ## Lancement du serveur sur le port 8001
 
 ```bash
 python -m uvicorn python_server.main:app --reload --host 0.0.0.0 --port 8001
-
 ```
 
 ## Documentation
@@ -112,12 +109,23 @@ APIs disponibles sur site-url/docs
 python -m python_server.scripts.extract_openapi python_server.main:app --out python_server/docs/openapi.json
 ```
 
+## Streamlit
+
+```bash
+streamlit run simple_app.py
+```
+
+Hack Windows Michaël
+
+```bash
+C:\Users\mmerl\anaconda3\envs\logiroadhitnet\python.exe -m streamlit run simple_app.py
+```
+
 ## Bibliothèques tierces
 
 * segmentation : <https://github.com/XuJiacong/PIDNet>
 
 Pour que cela fonctionne, il faut ajouter dans src/pretrained_models le dossier cityscapes disponible ici : <https://drive.google.com/drive/folders/1xDwOiH-Z0cOK_F6lvnykVyjry1s2njRS?usp=sharing>
-
 
 ## Tests unitaires (nouveau, en cours)
 
@@ -130,6 +138,3 @@ python -m unittest discover -s tests
 ## Docker installation
 
 to be done
-
-C:\Users\mmerl\anaconda3\envs\logiroadhitnet\python.exe -m streamlit run simple_app.py
-
