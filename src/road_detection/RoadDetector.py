@@ -22,6 +22,7 @@ class RoadDetector:
     roadSegmentator : RoadSegmentator
     window:AttentionWindow
     degree:int
+    thresh_windowed: npt.NDArray[np.uint8]
     def __init__(self,roadSegmentator : RoadSegmentator,window:AttentionWindow, degree=1,debug=False):
         self.roadSegmentator = roadSegmentator
         self.window = window
@@ -43,6 +44,7 @@ class EACRoadDetector(RoadDetector):
     img: npt.NDArray[np.uint8]
     camHeight=2.
 
+
     def __init__(self, roadSegmentator: RoadSegmentator, window:AttentionWindow, camHeight=2.,degree=1,debug=False):
         super().__init__(roadSegmentator, window=window,degree=degree,debug=debug)
         self.camHeight = camHeight
@@ -53,9 +55,9 @@ class EACRoadDetector(RoadDetector):
         if self.debug:
             cv2.imwrite(get_static_folder_path("windowed.png"), windowed)
         # Assuming you have a function to perform semantic segmentation
-        thresh_windowed = self.roadSegmentator.segment_road_image(windowed)
+        self.thresh_windowed = self.roadSegmentator.segment_road_image(windowed)
         thresh = np.zeros(img.shape[:2], dtype=np.uint8)
-        thresh[self.window.top:self.window.bottom, self.window.left:self.window.right] = thresh_windowed
+        thresh[self.window.top:self.window.bottom, self.window.left:self.window.right] = self.thresh_windowed
 
         contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     
@@ -165,10 +167,10 @@ class StereoRoadDetector(RoadDetector):
 
         if self.debug:
             cv2.imwrite(get_static_folder_path("windowed.png"), windowed)
-        thresh_windowed = self.roadSegmentator.segment_road_image(windowed)
+        self.thresh_windowed = self.roadSegmentator.segment_road_image(windowed)
         thresh = np.zeros(imgL.shape[:2], dtype=np.uint8)
 
-        thresh[self.window.top:self.window.bottom, self.window.left:self.window.right] = thresh_windowed
+        thresh[self.window.top:self.window.bottom, self.window.left:self.window.right] = self.thresh_windowed
         contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         
         if len(contours) == 0:

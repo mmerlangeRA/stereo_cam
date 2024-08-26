@@ -85,8 +85,13 @@ if uploaded_file is not None:
     x_first_poly = first_poly_model.predict(y_range[:, np.newaxis])
     x_second_poly = second_poly_model.predict(y_range[:, np.newaxis])
 
+    thresh = np.zeros(img.shape[:2], dtype=np.uint8)
+    thresh[roadDetector.window.top:roadDetector.window.bottom, roadDetector.window.left:roadDetector.window.right] = roadDetector.thresh_windowed
+    thresh = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
+    blended = cv2.addWeighted(img, 0.7, thresh, 0.3, 0)
+
     plt.figure(figsize=(10, 6))
-    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    plt.imshow(cv2.cvtColor(blended, cv2.COLOR_BGR2RGB))
     plt.plot(x_first_poly, y_range, color='red', linewidth=2, label='First Polynomial')
     plt.plot(x_second_poly, y_range, color='blue', linewidth=2, label='Second Polynomial')
     plt.scatter(x, y, color='yellow', s=5, label='Contour Points')
