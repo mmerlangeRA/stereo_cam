@@ -21,12 +21,14 @@ def fit_polynomial_ransac(x: npt.NDArray[np.float32], y: npt.NDArray[np.float32]
     - poly_model: Fitted polynomial model.
     - inlier_mask: Mask of inliers detected by RANSAC.
     """
+    if len(x) != len(y) or len(x)==0:
+        raise ValueError("x and y must have the same non zero length")
     poly_model = make_pipeline(PolynomialFeatures(degree), RANSACRegressor(residual_threshold=residual_threshold))
     poly_model.fit(x[:, np.newaxis], y)
     inlier_mask = poly_model.named_steps['ransacregressor'].inlier_mask_
     return poly_model, inlier_mask
 
-def find_best_2_polynomial_curves(contour: npt.NDArray[np.int32],degree=2) -> Tuple[make_pipeline, make_pipeline, npt.NDArray[np.int32], npt.NDArray[np.int32]]:
+def find_best_2_polynomial_curves(contour: npt.NDArray[np.int32],degree=2,max_pixel_distance=10) -> Tuple[make_pipeline, make_pipeline, npt.NDArray[np.int32], npt.NDArray[np.int32]]:
     """
     Finds and plots two polynomial curves fit to the given contour points.
 
@@ -44,14 +46,14 @@ def find_best_2_polynomial_curves(contour: npt.NDArray[np.int32],degree=2) -> Tu
     x = contour_points[:, 0]
     y = contour_points[:, 1]
     # Fit the first polynomial curve using RANSAC
-    first_poly_model, inliers_first = fit_polynomial_ransac(y, x,degree)
+    first_poly_model, inliers_first = fit_polynomial_ransac(y, x,degree,residual_threshold=max_pixel_distance)
 
     # Remove inliers to find the second polynomial curve
     y_inliers_first = y[inliers_first]
     x_outliers = x[~inliers_first]
     y_outliers = y[~inliers_first]
     # Fit the second polynomial curve using RANSAC
-    second_poly_model, inliers_second = fit_polynomial_ransac(y_outliers, x_outliers,degree)
+    second_poly_model, inliers_second = fit_polynomial_ransac(y_outliers, x_outliers,degree,residual_threshold=max_pixel_distance)
     y_inliers_second = y_outliers[inliers_second]
 
 

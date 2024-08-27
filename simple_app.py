@@ -62,13 +62,15 @@ if uploaded_file is not None:
     # Processing
     start_time = time.time()
     if use_seg != former_use_seg or use_1024 != former_use_1024:
-        print("new RoadSegmentator ")
-        if use_seg:
-            roadSegmentator = SegFormerRoadSegmentator(kernel_width=kernel_slider, use_1024=use_1024, debug=is_debug)
-        else:
-            roadSegmentator = PIDNetRoadSegmentator(kernel_width=kernel_slider,debug=is_debug)
-        former_seg = use_seg
-        former_use_1024=use_1024
+        print("new RoadSegmentator instance")
+        print(use_seg, use_1024)
+        print(former_use_seg, former_use_1024)
+    if use_seg:
+        roadSegmentator = SegFormerRoadSegmentator(kernel_width=kernel_slider, use_1024=use_1024, debug=is_debug)
+    else:
+        roadSegmentator = PIDNetRoadSegmentator(kernel_width=kernel_slider,debug=is_debug)
+    former_seg = use_seg
+    former_use_1024=use_1024
 
     roadDetector = EACRoadDetector(roadSegmentator=roadSegmentator,window=window,camHeight=cam_height_slider, degree=degree_slider, debug=is_debug)
     average_width, first_poly_model, second_poly_model, x, y = roadDetector.compute_road_width(img)
@@ -99,5 +101,21 @@ if uploaded_file is not None:
     plt.title('Polynomial Curves Fit to Contour Points')
     
     st.pyplot(plt)
+
+    #Test
+    x1 = 2167
+    y = 1600
+    x2= 2964
+
+    # x1= 2636
+    # y1 = 1413
+
+    # x2=2782
+    # y2 = 1413
+
+    imgWidth =5376
+    imgHeight = 2688
+    d,p1,p2 = roadDetector.compute_line_width(imgWidth, imgHeight, x1, x2,y,y)
+    print("distance", d, "p1", p1, "p2", p2)
     
 
