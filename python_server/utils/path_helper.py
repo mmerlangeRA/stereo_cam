@@ -21,7 +21,7 @@ def get_static_path(filename="")->str:
 def get_public_path(filename="")->str:
     return os.path.join(settings().server.base_url,filename)
 
-def get_photos_path(filename)->str:
+def get_uploaded_photos_path(filename)->str:
     photo_static_folder = create_static_folder(settings().data.photo_data_folder)
     return os.path.join(photo_static_folder, filename)
 

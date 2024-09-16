@@ -1,7 +1,7 @@
 from typing import List, Tuple
 import numpy as np
 import cv2
-from python_server.utils.path_helper import get_photos_path
+from python_server.utils.path_helper import get_uploaded_photos_path
 from src.triangulate.main import rotation_matrix_from_params,get_3d_point_cam1_2_from_coordinates
 from pydantic import BaseModel, Field
 from python_server.settings.settings import settings
@@ -29,8 +29,8 @@ class AutoCalibrationRequest(BaseModel):
         from_attributes = True
 
 def auto_calibrate_equipoloar(request:AutoCalibrationRequest, verbose=False)->List[float]:
-    imgLeft_path = request.imgLeft_name if "/" in request.imgLeft_name else get_photos_path(request.imgLeft_name)
-    imgRight_path = request.imgRight_name if "/" in request.imgRight_name else get_photos_path(request.imgRight_name)
+    imgLeft_path = request.imgLeft_name if "/" in request.imgLeft_name else get_uploaded_photos_path(request.imgLeft_name)
+    imgRight_path = request.imgRight_name if "/" in request.imgRight_name else get_uploaded_photos_path(request.imgRight_name)
 
     try:
         left_image = cv2.imread(imgLeft_path)
@@ -50,9 +50,9 @@ def auto_calibrate_equipoloar(request:AutoCalibrationRequest, verbose=False)->Li
 
 def triangulate_equipolar_points(request:TriangulationRequest, verbose=False)-> Tuple[List[float], List[float], float]:
     rot_matrix = rotation_matrix_from_params(request.R)
-    point1,point2,residual = get_3d_point_cam1_2_from_coordinates(request.keypoints_cam1, request.keypoints_cam2, request.image_width, request.image_height, rot_matrix, request.t, verbose)
+    point1,point2,residual_in_m = get_3d_point_cam1_2_from_coordinates(request.keypoints_cam1, request.keypoints_cam2, request.image_width, request.image_height, rot_matrix, request.t, verbose)
     if type(point1) is np.ndarray:
         point1 = point1.tolist()
     if type(point2) is np.ndarray:
         point2 = point2.tolist()
-    return point1, point2, residual
+    return point1, point2, residual_in_m

@@ -1,5 +1,6 @@
 import sys
 import cv2
+import os
 import numpy as np
 import torch
 from src.depth_estimation.selective_igev_code.core.igev_stereo import IGEVStereo
@@ -15,13 +16,13 @@ from src.utils.path_utils import get_pretrained_model_path
 # # Check if the directory is already in the system path
 # if directory not in sys.path:
 #     sys.path.append(directory)
-print(sys.path)
-import os
+#print(sys.path)
+
 import torch.nn.functional as F
 
-DEVICE = 'cuda'
-import os
+
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
 
 class Args:
     def __init__(self, **kwargs):
@@ -29,6 +30,8 @@ class Args:
 
 class Selective_igev(StereoMethod):
     def __init__(self, args,config: Config):
+        
+        self.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
         super().__init__("Selective_igev",
                          {},
                          config)
@@ -54,18 +57,16 @@ class Selective_igev(StereoMethod):
             for arg in vars(args):
                 self.args[arg]=getattr(args, arg)
 
-
-
     def compute_disparity(self, input: InputPair) -> StereoOutput:    
         imgL = torch.from_numpy(input.left_image).permute(2, 0, 1).float()
-        imgL=imgL[None].to(DEVICE)
+        imgL=imgL[None].to(self.DEVICE)
         imgR = torch.from_numpy(input.right_image).permute(2, 0, 1).float()
-        imgR=imgR[None].to(DEVICE)
+        imgR=imgR[None].to(self.DEVICE)
         model = torch.nn.DataParallel(IGEVStereo(self.args), device_ids=[0])
         model.load_state_dict(torch.load(self.args.restore_ckpt))
 
         model = model.module
-        model.to(DEVICE)
+        model.to(self.DEVICE)
         model.eval()
         with torch.no_grad():
             padder = InputPadder(imgL.shape, divis_by=32)

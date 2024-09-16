@@ -240,7 +240,8 @@ class StereoRoadDetector(RoadDetector):
         """
         img is split into 2 left and right images
         """
-        cv2.imshow("img_left_right",img_left_right)
+        if self.debug:
+            cv2.imshow("img_left_right",img_left_right)
         height, width = img_left_right.shape[:2]
         # Ensure the width is even so that it can be evenly split into two halves
         assert width % 2 == 0, "Image width is not even. Cannot split into two equal halves."
@@ -250,8 +251,6 @@ class StereoRoadDetector(RoadDetector):
 
         # Split the image into left and right halves
         imgL = img_left_right[:, :middle]
-        cv2.imshow("imgL",imgL)
-        cv2.waitKey(0)
         imgR = img_left_right[:, middle:]
 
         test_igev = Selective_igev(None, None)
@@ -331,9 +330,19 @@ class StereoRoadDetector(RoadDetector):
             print(distances)
             
             cv2.imshow('contours', contour_image)
-            cv2.imshow('disparity_map', disparity_map)
-            cv2.imwrite(get_static_folder_path("disparity.png"), disparity_map)
+
             cv2.imwrite(get_static_folder_path("contours.png"), contour_image)
+            
+            disparity_map_normalized = cv2.normalize(disparity_map, None, 0, 255, cv2.NORM_MINMAX)
+            # Apply a colormap (e.g., COLORMAP_JET)
+            colorized_disparity_map = cv2.applyColorMap(disparity_map_normalized.astype(np.uint8), cv2.COLORMAP_JET)
+            # Display the colorized disparity map
+            cv2.imshow('Colorized Disparity Map', colorized_disparity_map)
+
+            cv2.imwrite(get_static_folder_path("colorized_disparity_map.png"), colorized_disparity_map)
+            
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
         return np.mean(distances),first_poly_model, second_poly_model,contour_x,contour_y
 

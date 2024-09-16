@@ -25,8 +25,6 @@ def find_images_paths_in_folder(root_dir, extensions=[".png",".jpg",".jpeg"])->L
                     image_files.append(os.path.join(root, file))
     return image_files
 
-
-
 def load_and_preprocess_cube_front_images(folder:str,verbose=False)->List[cv2.typing.MatLike]:
     if verbose:
         print('load_and_preprocess_cube_front_images')

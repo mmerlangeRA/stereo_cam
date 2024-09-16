@@ -64,7 +64,8 @@ if __name__ == '__main__':
     # project on road plane
     road_rvec=[0,0,0]
     road_tvec=[0,args.camHeight,0]
-    road_points = roadDetector.eac_to_road_plane(imgWidth=width, imgHeight=height, road_rvec=road_rvec,road_tvec=road_tvec,contour_x=contour_x, contour_y=contour_y)
+    
+    #road_points = roadDetector.eac_to_road_plane(imgWidth=width, imgHeight=height, road_rvec=road_rvec,road_tvec=road_tvec,contour_x=contour_x, contour_y=contour_y)
 
     # Generate y values for plotting the polynomial curves
     y_range = np.linspace(np.min(contour_y), np.max(contour_y), 500)

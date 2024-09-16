@@ -9,7 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from python_server.utils.errors import INTERNAL_SERVER_ERROR_HTTPEXCEPTION, NOT_FOUND_HTTPEXCEPTION
 from python_server.utils.tokens import verify_token
-from python_server.utils.path_helper import get_photos_path, get_public_photo_path, get_static_path
+from python_server.utils.path_helper import get_uploaded_photos_path, get_public_photo_path, get_static_path
 from python_server.utils.types import Processed_file_response
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ photo_router = APIRouter(prefix="/v1/photo")
 @photo_router.post("/", tags=["photos"],response_model=Processed_file_response)
 async def upload_image(file: UploadFile = File(...))->Processed_file_response:
     try:
-        file_location = Path(get_photos_path(file.filename))
+        file_location = Path(get_uploaded_photos_path(file.filename))
         with file_location.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         public_path = get_public_photo_path(file.filename)
@@ -41,7 +41,7 @@ async def list_files() -> List[str]:
 @photo_router.delete("/files/{filename}", tags=["photos"])
 async def delete_file(filename: str):
     try:
-        file_path = Path(get_photos_path(filename))
+        file_path = Path(get_uploaded_photos_path(filename))
         if not file_path.exists() or not file_path.is_file():
             raise NOT_FOUND_HTTPEXCEPTION("File not found")
 
