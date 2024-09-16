@@ -3,7 +3,10 @@ set_paths()
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
-from src.road_detection.main import AttentionWindow, compute_road_width_from_eac
+
+from src.road_detection.RoadSegmentator import PIDNetRoadSegmentator, SegFormerRoadSegmentator
+from src.road_detection.RoadDetector import EACRoadDetector
+from src.road_detection.common import AttentionWindow
 import argparse
 
 def parse_arguments():
@@ -17,6 +20,9 @@ def parse_arguments():
     parser.add_argument('--window_right', type=float, default=0.6, help='Attention window top.')
     parser.add_argument('--window_top', type=float, default=0.3, help='Attention window top.')
     parser.add_argument('--window_bottom', type=float, default=0.6, help='Attention window bottom.')
+    parser.add_argument('--debug', type=bool, default=False, help='Show debug info.')
+    parser.add_argument('--segformer', type=bool, default=False, help='Use Segfomer.')
+    parser.add_argument('--segformer_1024', type=bool, default=False, help='Use Segfomer with 1024 model.')
 
     return parser.parse_args()
 
@@ -44,16 +50,25 @@ if __name__ == '__main__':
     limit_bottom = int(args.window_bottom * height)
     window = AttentionWindow(limit_left, limit_right, limit_top, limit_bottom)
 
-    # Other params
-    degree = args.degree
-    camHeight = args.camHeight
-
     #processing
-    average_width,first_poly_model, second_poly_model,x,y = compute_road_width_from_eac(img,window,camHeight=1.65,degree=1,debug=True)
+    if args.segformer:
+        roadSegmentator = SegFormerRoadSegmentator(kernel_width=10, use_1024=args.segformer_1024, debug=args.debug)
+    else:
+        roadSegmentator = PIDNetRoadSegmentator(kernel_width=10,debug=args.debug)
 
+    roadDetector = EACRoadDetector(roadSegmentator=roadSegmentator,window=window,camHeight=args.camHeight, degree=args.degree, debug=args.debug)
+    average_width, first_poly_model, second_poly_model, contour_x, contour_y = roadDetector.compute_road_width(img)
+
+  
     # Debug infos
+    # project on road plane
+    road_rvec=[0,0,0]
+    road_tvec=[0,args.camHeight,0]
+    
+    #road_points = roadDetector.eac_to_road_plane(imgWidth=width, imgHeight=height, road_rvec=road_rvec,road_tvec=road_tvec,contour_x=contour_x, contour_y=contour_y)
+
     # Generate y values for plotting the polynomial curves
-    y_range = np.linspace(np.min(y), np.max(y), 500)
+    y_range = np.linspace(np.min(contour_y), np.max(contour_y), 500)
 
     # Predict x values using the polynomial models
     x_first_poly = first_poly_model.predict(y_range[:, np.newaxis])
@@ -63,7 +78,7 @@ if __name__ == '__main__':
     plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     plt.plot(x_first_poly, y_range, color='red', linewidth=2, label='First Polynomial')
     plt.plot(x_second_poly, y_range, color='blue', linewidth=2, label='Second Polynomial')
-    plt.scatter(x, y, color='yellow', s=5, label='Contour Points')
+    plt.scatter(contour_x, contour_y, color='yellow', s=5, label='Contour Points')
     plt.legend()
     plt.title('Polynomial Curves Fit to Contour Points')
     plt.savefig(r'C:\Users\mmerl\projects\stereo_cam\output\polynomial_fit.png')

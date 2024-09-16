@@ -21,7 +21,7 @@ def get_static_path(filename="")->str:
 def get_public_path(filename="")->str:
     return os.path.join(settings().server.base_url,filename)
 
-def get_photos_path(filename)->str:
+def get_uploaded_photos_path(filename)->str:
     photo_static_folder = create_static_folder(settings().data.photo_data_folder)
     return os.path.join(photo_static_folder, filename)
 
@@ -44,13 +44,6 @@ def get_tmp_static_folder()->str:
     if not os.path.exists(tmp_folder):
         os.makedirs(tmp_folder)
     return tmp_folder
-
-
-def get_calibration_file_path(filename:str)->str:
-    calibration_folder = os.path.join(os.getcwd(), 'calibration')
-    if not os.path.exists(calibration_folder):
-        os.makedirs(calibration_folder)
-    return os.path.join(calibration_folder,filename)
 
 def get_image_paths(folder):
     print("folder", folder)

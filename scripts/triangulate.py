@@ -38,7 +38,7 @@ def main():
             bnds=args.bnds,
             inlier_threshold=args.inlier_threshold
         )
-        result = auto_calibrate_equipoloar(request)
+        result = auto_calibrate_equipoloar(request,verbose=args.verbose)
         print(f"Optimized Parameters: {result}")
 
     elif args.command == "triangulatePoints":
@@ -51,7 +51,7 @@ def main():
             t=args.t,
             verbose=args.verbose
         )
-        point1, point2, residual = triangulate_equipolar_points(request)
+        point1, point2, residual = triangulate_equipolar_points(request,verbose=args.verbose)
         print(f"3D Point Camera 1: {point1}")
         print(f"3D Point Camera 2: {point2}")
         print(f"Residual: {residual}")

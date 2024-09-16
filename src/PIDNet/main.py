@@ -58,10 +58,6 @@ def load_pretrained(model, pretrained):
         pretrained_dict = pretrained_dict['state_dict']
     model_dict = model.state_dict()
     pretrained_dict = {k[6:]: v for k, v in pretrained_dict.items() if (k[6:] in model_dict and v.shape == model_dict[k[6:]].shape)}
-    msg = 'Loaded {} parameters!'.format(len(pretrained_dict))
-    print('Attention!!!')
-    print(msg)
-    print('Over!!!')
     model_dict.update(pretrained_dict)
     model.load_state_dict(model_dict, strict = False)
     
@@ -76,8 +72,9 @@ model = load_pretrained(model, model_path).cuda()
 model.eval()
 
 
-def segment_image(img:cv2.mat_wrapper)->tuple[cv2.typing.MatLike,any] :
+def segment_image(img:cv2.mat_wrapper)->tuple[cv2.typing.MatLike,any, int] :
     global model
+    road_label = 0
     sv_img = np.zeros_like(img).astype(np.uint8)
     img = input_transform(img)
     img = img.transpose((2, 0, 1)).copy()
@@ -91,7 +88,7 @@ def segment_image(img:cv2.mat_wrapper)->tuple[cv2.typing.MatLike,any] :
         for j in range(3):
             sv_img[:,:,j][pred==i] = color_map[i][j]
     
-    return sv_img,pred
+    return sv_img,pred, road_label
 
 
 if __name__ == '__main__':

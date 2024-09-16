@@ -13,6 +13,9 @@ def get_pretrained_model_path(lib:str,model:str) -> str:
 def get_static_folder_path(path="") -> str:
     return os.path.join(get_root(), "static",path)
 
+def get_calibration_folder_path(path="") -> str:
+    return os.path.join(get_root(), "calibration", path)
+
 def find_images_paths_in_folder(root_dir, extensions=[".png",".jpg",".jpeg"])->List[str]: 
     image_files = []
     for root, _, files in os.walk(root_dir):

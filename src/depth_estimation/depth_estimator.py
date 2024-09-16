@@ -16,6 +16,7 @@ class Calibration:
     cx1: float
     cy: float
     baseline_meters: float
+    z0: float = float('-inf')
     depth_range: Tuple[float] = (0.3, 20.0)
     left_image_rect_normalized: np.ndarray = field(default_factory=lambda: np.array([0., 0., 1., 1.]))  # origin, size in percent of image size
     comment: str = ""

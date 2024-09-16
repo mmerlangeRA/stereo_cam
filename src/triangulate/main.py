@@ -23,9 +23,25 @@ def triangulate_point(ray1: np.ndarray, ray2: np.ndarray, t: np.ndarray, R_matri
     # Calculate the 3D point using lambda1
     point_3d_1 = lambda1 * ray1
     point_3d_2 = R_matrix @ (lambda2 * ray2) + t
+    #point_3d_2 = lambda2 * ray2
 
-    residual_distance_normalized = np.linalg.norm(point_3d_1 - point_3d_2)
-    residual_distance_normalized /= np.linalg.norm(point_3d_1)
+    residual_distance_in_m = np.linalg.norm(point_3d_1 - point_3d_2)
+    max_acceptable_distance=20.
+
+    min_d = min(np.linalg.norm(point_3d_1), np.linalg.norm(point_3d_2))
+    #residual_distance_normalized /= min_d
+    '''
+    if min_d>max_acceptable_distance:
+        r= max_acceptable_distance/min_d
+        ratio = r*min_d+(1.-r)*max_acceptable_distance
+        residual_distance_normalized/=ratio
+    else:
+        residual_distance_normalized/=min_d
+    '''
+    #residual_distance_normalized/=min_d
+
+    #if min_d>max_acceptable_distance:
+    #    residual_distance_normalized*=10.*min_d/max_acceptable_distance
 
     if verbose:
         print("ray1", ray1)
@@ -36,7 +52,7 @@ def triangulate_point(ray1: np.ndarray, ray2: np.ndarray, t: np.ndarray, R_matri
         predicted_b = A @ lambdas
         print("predicted_b", predicted_b)
 
-    return point_3d_1, lambda2 * ray2, residual_distance_normalized
+    return point_3d_1, lambda2*ray2, residual_distance_in_m
 
 def get_3d_point_cam1_2_from_coordinates(keypoints_cam1: Tuple[float, float], keypoints_cam2: Tuple[float, float], image_width: int, image_height: int, R: np.ndarray, t: np.ndarray, verbose: bool=False) -> Tuple[np.ndarray, np.ndarray, float]:
     """Get 3D points from camera coordinates."""
@@ -48,5 +64,5 @@ def get_3d_point_cam1_2_from_coordinates(keypoints_cam1: Tuple[float, float], ke
 
     ray1 = spherical_to_cartesian(theta1, phi1)
     ray2 = spherical_to_cartesian(theta2, phi2)
-    point_3d_cam1, point_3d_cam2, residual_distance_normalized = triangulate_point(ray1, ray2, t, R, verbose)
-    return point_3d_cam1, point_3d_cam2, residual_distance_normalized
+    point_3d_cam1, point_3d_cam2, residual_distance_in_m = triangulate_point(ray1, ray2, t, R, verbose=verbose)
+    return point_3d_cam1, point_3d_cam2, residual_distance_in_m

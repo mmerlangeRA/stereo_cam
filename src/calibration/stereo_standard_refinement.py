@@ -4,7 +4,7 @@ import numpy as np
 from src.features_2d.utils import detectAndComputeKPandDescriptors
 from scipy.optimize import least_squares
 
-def reprojection_error(params:List[float],pts1, pts2, K, dist_coeffs:List[float])->float:
+def compute_reprojection_residual(params:List[float],pts1, pts2, dist_coeffs:List[float])->float:
     """
     Computes the reprojection error for optimization.
 
@@ -18,14 +18,18 @@ def reprojection_error(params:List[float],pts1, pts2, K, dist_coeffs:List[float]
     Returns:
         np.ndarray: Reprojection error.
     """
+
+    # Ensure pts1 and pts2 are in 2xN format
+    # pts1 = pts1.T if pts1.shape[0] != 2 else pts1
+    # pts2 = pts2.T if pts2.shape[0] != 2 else pts2
+
     fx = params[0]
     fy = params[1]
     cx= params[2]
     cy= params[3]
-    K[0, 0]  = fx
-    K[1, 1] = fy
-    K[0, 2] = cx
-    K[1, 2] = cy
+    K = np.array([[fx, 0, cx],
+            [0, fy, cy],
+            [0, 0, 1]])
     P1 = K @ np.hstack((np.eye(3), np.zeros((3, 1))))
 
     rvec = params[4:7].reshape(3, 1)
@@ -35,12 +39,9 @@ def reprojection_error(params:List[float],pts1, pts2, K, dist_coeffs:List[float]
 
     # Triangulate points
     points_4d = cv2.triangulatePoints(P1, P2, pts1, pts2)
+
     points_3d = points_4d[:3] / points_4d[3]
     points_3d = points_3d.T
-    
-    # projected_points= K@points_3d.T 
-    # projected_points = projected_points
-    # distances = np.abs((pts1 - projected_points).ravel())
 
     projected_points, _ = cv2.projectPoints(points_3d, rvec, tvec, K, dist_coeffs)
     projected_points = projected_points.reshape(-1, 2)
@@ -50,12 +51,7 @@ def reprojection_error(params:List[float],pts1, pts2, K, dist_coeffs:List[float]
     residual = np.average(distances)
     return residual
 
-    # initial_params = np.hstack(([fx_init],[fy_init], [cx_init],[cy_init],rvec_init.ravel(), tvec_init.ravel()))
-    # bounds=([100,100,w/2.5, h/2.5,-0.1,-0.1,-0.1,-1.13,-0.03,-0.03],
-    #         [2000,2000, w/1.5, h/1.5,0.1,0.1,0.1,-1.11,0.03,0.03])
-
-
-def compute_auto_calibration_for_2_stereo_standard_images(imgLeft:cv2.typing.MatLike, imgRight:cv2.typing.MatLike,verbose=False)-> Tuple[np.ndarray, float, np.ndarray, np.ndarray]:
+def compute_auto_calibration_for_2_stereo_standard_images(imgLeft:cv2.typing.MatLike, imgRight:cv2.typing.MatLike,verbose=True)-> Tuple[np.ndarray, float, np.ndarray, np.ndarray]:
     """
     Automatically calibrates a stereo camera setup using two standard images.
 
@@ -111,16 +107,11 @@ def compute_auto_calibration_for_2_stereo_standard_images(imgLeft:cv2.typing.Mat
     h, w = images[0].shape[:2]
 
     # Initial guess 
-    focal_length_init = 700.0   #in pixels
     fx_init = fy_init= 700.0   #in pixels
     cx_init = w/2
     cy_init = h/2
     rvec_init = np.array([[-0.03], [0.08], [-0.017]], dtype=np.float32)
     tvec_init = np.array([[-1.12], [0.02], [0.01]], dtype=np.float32)
-
-    K = np.array([[focal_length_init, 0, w / 2],
-                [0, focal_length_init, h / 2],
-                [0, 0, 1]])
 
 
     # Initial parameter guess (focal length)
@@ -129,7 +120,7 @@ def compute_auto_calibration_for_2_stereo_standard_images(imgLeft:cv2.typing.Mat
             [2000,2000, w/1.5, h/1.5,0.1,0.1,0.1,-1.11,0.03,0.03])
 
     # Perform bundle adjustment
-    result = least_squares(reprojection_error, initial_params, args=(pts1,pts2, K, np.zeros(5)), bounds=bounds)
+    result = least_squares(compute_reprojection_residual, initial_params, args=(pts1,pts2, np.zeros(5)), bounds=bounds, loss='huber')
     refined_params = result.x
     
     refined_params= result.x
@@ -142,15 +133,16 @@ def compute_auto_calibration_for_2_stereo_standard_images(imgLeft:cv2.typing.Mat
 
 
     # Update the camera matrix with the refined focal length
-    K[0, 0] = refined_fx
-    K[1, 1] = refined_fy
-    K[0, 2] = refined_cx
-    K[1, 2] = refined_cy
+    K = np.array([[refined_fx, 0, refined_cx],
+            [0, refined_fx, refined_cy],
+            [0, 0, 1]])
 
     if verbose:
+        print("nb kp",len(filtered_pts1))
         print("Refined Focal Length: ", refined_fx)
         print("Refined Rotation Vector:\n", refined_rvec)
         print("Refined Translation Vector:\n", refined_tvec)
         print("Updated Camera Matrix:\n", K)
+        print("Final Reprojection Error Cost:", result.cost)
 
     return K,result.cost,refined_rvec,refined_tvec
