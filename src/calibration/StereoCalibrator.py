@@ -51,6 +51,8 @@ class StereoFullCalibration:
 
     def from_json(json_str):
         d = json.loads(json_str)
+        d['mono_K'] = np.asarray(d['mono_K'])
+        d['mono_dist'] = np.asarray(d['mono_dist'])
         return StereoFullCalibration(**d)
 
 def compute_reprojection_residual(params:List[float],pts1, pts2, dist_coeffs:List[float])->float:
@@ -194,7 +196,7 @@ class StereoCalibrator:
 
     
     def undistort_and_crop(self,leftImg)-> tuple[cv2.typing.MatLike,cv2.typing.MatLike]:
-        undistorted_left,newcameramtx = undistort_and_crop(leftImg, self.calibration.mono_K, self.calibration.mono_dist)
+        undistorted_left,newcameramtx = undistort_and_crop(leftImg,self.calibration.mono_K, self.calibration.mono_dist)
         return undistorted_left,newcameramtx
     
     def compute_global_auto_calibration(self,image_paths_left: List[str], 

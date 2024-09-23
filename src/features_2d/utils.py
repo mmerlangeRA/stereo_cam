@@ -15,7 +15,7 @@ def detectAndComputeKPandDescriptors(img: cv2.Mat) -> Tuple[List[cv2.KeyPoint], 
     kpts, desc = akaze.detectAndCompute(img, None)
     return kpts, desc
 
-def getMatches(desc1: cv2.Mat, desc2: cv2.Mat) -> List[List[cv2.DMatch]]:
+def getMatches(desc1: cv2.Mat, desc2: cv2.Mat,nn_match_ratio=0.5) -> List[List[cv2.DMatch]]:
     """
     Finds matches between descriptors using brute-force hamming distance.
 
@@ -28,4 +28,10 @@ def getMatches(desc1: cv2.Mat, desc2: cv2.Mat) -> List[List[cv2.DMatch]]:
     """
     matcher = cv2.DescriptorMatcher_create(cv2.DescriptorMatcher_BRUTEFORCE_HAMMING)
     nn_matches = matcher.knnMatch(desc1, desc2, 2)
-    return nn_matches
+    good_matches=[]
+    for i, (m, n) in enumerate(nn_matches):
+        if m.distance < nn_match_ratio * n.distance:
+            good_matches.append(m)
+    return good_matches
+
+

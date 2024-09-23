@@ -3,20 +3,21 @@ import random
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
-
-from src.depth_estimation.depth_estimator import Calibration, InputPair
 from src.depth_estimation.selective_igev import Selective_igev
+from src.depth_estimation.depth_estimator import Calibration, InputPair
 from src.utils.path_utils import get_static_folder_path
 from typing import Tuple, List, Optional
 import numpy.typing as npt
 
 from src.utils.curve_fitting import find_best_2_polynomial_curves, fit_polynomial_ransac
-from src.utils.disparity import compute_3d_position_from_disparity
+from src.utils.disparity import compute_3d_position_from_disparity_map
 from src.utils.coordinate_transforms import eac_to_road_plane, get_transformation_matrix, pixel_to_spherical, spherical_to_cartesian
 from src.road_detection.RoadSegmentator import RoadSegmentator
 from src.road_detection.common import AttentionWindow
 from src.calibration.StereoCalibrator import StereoFullCalibration
 from scipy.optimize import minimize
+
+from src.utils.image_processing import colorize_disparity_map
 
 
 class RoadDetector:
@@ -252,13 +253,16 @@ class StereoRoadDetector(RoadDetector):
         # Split the image into left and right halves
         imgL = img_left_right[:, :middle]
         imgR = img_left_right[:, middle:]
-
+        print("imgL", imgL.shape)
+        print("imgR", imgR.shape)
         test_igev = Selective_igev(None, None)
         input_pair = InputPair(left_image=imgL, right_image=imgR, status="started", calibration=self.calibration)
         stereo_output = test_igev.compute_disparity(input_pair)
         disparity_map = stereo_output.disparity_pixels
-
+        
         K = self.calibration.stereo_rectified_K
+        if K is None or len(K) == 0:
+            raise ValueError("no calibration data")
 
         fx = K[0][0]
         fy = K[1][1]
@@ -280,7 +284,7 @@ class StereoRoadDetector(RoadDetector):
         contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         
         if len(contours) == 0:
-            print("no road")
+            raise ValueError("no road")
 
         contour = max(contours, key=cv2.contourArea)
         contour_points = contour[:, 0, :]
@@ -305,8 +309,8 @@ class StereoRoadDetector(RoadDetector):
         for y in range(minY, maxY):
             x_first_poly = first_poly_model.predict([[y]])[0]
             x_second_poly = second_poly_model.predict([[y]])[0]
-            p1, d1 = compute_3d_position_from_disparity(x_first_poly, y, disparity_map, fx, fy,c_x, c_y, baseline,z0)
-            p2, d2 = compute_3d_position_from_disparity(x_second_poly, y, disparity_map, fx, fy,c_x, c_y, baseline,z0)
+            p1, d1 = compute_3d_position_from_disparity_map(x_first_poly, y, disparity_map, fx, fy,c_x, c_y, baseline,z0)
+            p2, d2 = compute_3d_position_from_disparity_map(x_second_poly, y, disparity_map, fx, fy,c_x, c_y, baseline,z0)
             # if np.abs(d2 - d1) > 10:
             #     print(d2, d1)
 
@@ -333,9 +337,7 @@ class StereoRoadDetector(RoadDetector):
 
             cv2.imwrite(get_static_folder_path("contours.png"), contour_image)
             
-            disparity_map_normalized = cv2.normalize(disparity_map, None, 0, 255, cv2.NORM_MINMAX)
-            # Apply a colormap (e.g., COLORMAP_JET)
-            colorized_disparity_map = cv2.applyColorMap(disparity_map_normalized.astype(np.uint8), cv2.COLORMAP_JET)
+            colorized_disparity_map = colorize_disparity_map(disparity_map)
             # Display the colorized disparity map
             cv2.imshow('Colorized Disparity Map', colorized_disparity_map)
 

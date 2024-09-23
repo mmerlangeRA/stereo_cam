@@ -29,6 +29,8 @@ class Args:
         self.__dict__.update(kwargs)
 
 class Selective_igev(StereoMethod):
+    model='igev'
+    ckpt='middlebury_finetune.pth'
     def __init__(self, args,config: Config):
         
         self.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -39,7 +41,8 @@ class Selective_igev(StereoMethod):
 
         self._loaded_session = None
         self._loaded_model_path = None
-        default_model_path = get_pretrained_model_path("igev",'middlebury_finetune.pth')
+        default_model_path = get_pretrained_model_path(self.model,self.ckpt)
+
         args_dict={
             'hidden_dims':[128]*3,
             'valid_iters':180,
@@ -75,10 +78,10 @@ class Selective_igev(StereoMethod):
             disp = model(image1, image2, iters=self.args.valid_iters, test_mode=True)
             disp = disp.cpu().numpy()
             disp = padder.unpad(disp)
-            print(np.min(disp))
-            print(np.max(disp))
-            print(disp.shape)
-            print(disp.squeeze().shape)
+            # print(np.min(disp))
+            # print(np.max(disp))
+            # print(disp.shape)
+            # print(disp.squeeze().shape)
             # file_stem = os.path.basename(imfile1).split('.')[0]
             # filename = os.path.join(output_directory, f'{file_stem}.png')
             # plt.imsave(filename, disp.squeeze(), cmap='jet')

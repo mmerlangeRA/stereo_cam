@@ -8,6 +8,22 @@ def get_cube_sub_images(image:cv2.typing.MatLike)->cv2.typing.MatLike:
     
     return sub_images
 
+def get_cube_faces(image:cv2.typing.MatLike)->cv2.typing.MatLike:
+    h,w=image.shape[:2]
+    sub_w = int(w/4)
+    sub_h = int(h/3)
+
+    cube_faces = {
+        'front': image[sub_h:sub_h*2,sub_w*2:sub_w*3],
+        'back': image[sub_h:sub_h*2,:sub_w],
+        'left': image[sub_h:sub_h*2,sub_w:sub_w*2],
+        'right':image[sub_h:sub_h*2,sub_w*3:sub_w*4],
+        'top': image[0:sub_h,:sub_w],
+        'bottom': image[sub_h*2:,:sub_w],
+    }
+    
+    return cube_faces
+
 def get_cube_front_image(image:cv2.typing.MatLike)->cv2.typing.MatLike:
     h,w=image.shape[:2]
     sub_w = int(w/4)

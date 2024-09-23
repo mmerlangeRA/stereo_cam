@@ -62,15 +62,13 @@ def calibrate_left_right(imLeft:cv2.Mat, imRight:cv2.Mat, initial_params,bnds,in
     #kpts to uv
     uv1 = [[k.pt[0], k.pt[1]] for k in kpts1]
     uv2 = [[k.pt[0], k.pt[1]] for k in kpts2]
-    nn_matches = getMatches(desc1, desc2)
+    good_matches = getMatches(desc1, desc2,nn_match_ratio=nn_match_ratio)
     matched1 = []
     matched2 = []
-    good_matches = [[0, 0] for i in range(len(nn_matches))] 
-    for i, (m, n) in enumerate(nn_matches):
-        if m.distance < nn_match_ratio * n.distance:
-            matched1.append(uv1[m.queryIdx])
-            matched2.append(uv2[m.trainIdx])
-            good_matches[i] = [1, 0] 
+    for m in good_matches:
+        matched1.append(uv1[m.queryIdx])
+        matched2.append(uv2[m.trainIdx])
+
 
     num_elements = int(len(matched1)*0.5)
     num_elements = 4
@@ -80,7 +78,7 @@ def calibrate_left_right(imLeft:cv2.Mat, imRight:cv2.Mat, initial_params,bnds,in
                                     kpts1, 
                                     imRight, 
                                     kpts2, 
-                                    nn_matches, 
+                                    good_matches, 
                                     outImg=None, 
                                     matchColor=(0, 155, 0), 
                                     singlePointColor=(0, 255, 255), 
@@ -91,7 +89,7 @@ def calibrate_left_right(imLeft:cv2.Mat, imRight:cv2.Mat, initial_params,bnds,in
         # saving the image  
         cv2.imwrite(get_static_folder_path('Match.jpg'), Matched)
         #cv2.waitKey(0)
-        print(f'nb good matches {len(matched1)} out of {len(nn_matches)}')
+        print(f'nb good matches {len(matched1)} ')
     nb_iter = 0
     nb_good_matches = len(matched1)
     best_result = {
