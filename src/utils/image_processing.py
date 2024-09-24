@@ -306,8 +306,6 @@ def detect_sign(disparity_map:cv2.typing.MatLike, sign_window:AttentionWindow,nb
     # Return only the binary image if no quadrilateral is found
     return binary_image, None, None
 
-import numpy as np
-
 def project_image_to_plane(
     image_2d: npt.NDArray[np.uint8],
     plane_center: npt.NDArray[np.float_],
@@ -357,59 +355,64 @@ def project_image_to_plane(
 
     return points_3d
 
-
-def map_image_to_equirectangular(
-        image_2d:npt.NDArray[np.uint8], 
-        plane_center:npt.NDArray[np.float_], 
-        plane_normal:npt.NDArray[np.float_],
-        plane_up_vector:npt.NDArray[np.float_],
-        plane_width:float, plane_height:float,
-        equirect_width:int, equirect_height:int
-        )->npt.NDArray[np.uint8]:
+def get_transparency_mask(image: np.ndarray) -> np.ndarray:
     """
-    Maps a 2D image onto an equirectangular image based on the plane's position and orientation.
+    Returns a mask where non-transparent pixels are white (255) and transparent pixels are black (0).
     
     Parameters:
-    - image_2d: The 2D image as a NumPy array of shape (H, W, C).
-    - plane_center, plane_normal, plane_up_vector, plane_width, plane_height: Parameters defining the plane.
-    - equirect_width, equirect_height: Dimensions of the equirectangular image.
+    - image: NumPy array of shape (H, W, 4) for RGBA images.
     
     Returns:
-    - equirect_image: The equirectangular image with the 2D image projected onto it.
+    - mask: Grayscale mask image of shape (H, W).
     """
-    #H, W = image_2d.shape[:2]
-    equirect_image = np.zeros((equirect_height, equirect_width, 3), dtype=np.uint8)
+    # Split the image into color and alpha channels
+    if  image.shape[2] == 4:
+        b_channel, g_channel, r_channel, alpha_channel = cv2.split(image)
+        # Create a mask where alpha channel is greater than 0
+        mask = cv2.threshold(alpha_channel, 0, 255, cv2.THRESH_BINARY)[1]
+    elif image.shape[2] == 3:
+        mask = np.ones_like(image[:,:,0], dtype=np.uint8) * 255
+    else:
+        raise ValueError("Image must be RGBA or RGB format.")
     
-    # Compute 3D points on the plane
-    points_3d = project_image_to_plane(
-        image_2d, plane_center, plane_normal, plane_up_vector, plane_width, plane_height)
-    x = points_3d[:, :, 0]
-    y = points_3d[:, :, 1]
-    z = points_3d[:, :, 2]
-    
-    # Convert to spherical coordinates
-    _, theta, phi = cartesian_to_spherical_array(x, y, z)
-    
-    # Map to equirectangular coordinates
-    u, v = spherical_to_equirectangular_array(theta, phi, equirect_width, equirect_height)
-    
-    # Flatten arrays for easier indexing
-    u_flat = u.flatten()
-    v_flat = v.flatten()
-    pixels = image_2d.reshape(-1, 3)
+    return mask
 
-    # Round to nearest integer pixel coordinates
-    u_int = np.floor(u_flat).astype(int)
-    v_int = np.floor(v_flat).astype(int)
+def crop_transparent_borders(image: np.ndarray) -> np.ndarray:
+    """
+    Crops the transparent borders of an image.
 
-    # Wrap the u_int values to handle longitude wrapping (modulo operation)
-    u_int = u_int % equirect_width  # Ensures u_int is within [0, equirect_width - 1]
-    v_int = v_int % equirect_height
-    # Clamp the v_int values to the valid range [0, equirect_height - 1]
-    #v_int = np.clip(v_int, 0, equirect_height - 1)
+    Parameters:
+    - image: NumPy array of shape (H, W, 4) for RGBA images.
 
-    # Now, no need for valid_mask since u_int and v_int are within valid ranges
-    # Assign pixel values to equirectangular image
-    equirect_image[v_int, u_int] = pixels
+    Returns:
+    - cropped_image: The image cropped to exclude transparent borders.
+    """
+    # Check if image has an alpha channel
+    if image.shape[2] == 4:
+        # Extract the alpha channel
+        alpha_channel = image[:, :, 3]
+        
+        # Create a binary mask where alpha values are greater than 0
+        mask = alpha_channel > 0
+    elif image.shape[2] == 3:
+        mask = np.ones_like(image[:,:,0], dtype=np.uint8) * 255
+    else:
+        print("The image does not have an alpha channel and is not RGB.")
+        return image
+        
+    # If all pixels are transparent, return the original image
+    if not np.any(mask):
+        print("The image is fully transparent.")
+        return image
     
-    return equirect_image
+    # Find coordinates of non-transparent pixels
+    coords = np.argwhere(mask)
+    
+    # Get the bounding box of non-transparent pixels
+    y0, x0 = coords.min(axis=0)
+    y1, x1 = coords.max(axis=0) + 1  # Add 1 because slicing is exclusive at the top
+    
+    # Crop the image to the bounding box
+    cropped_image = image[y0:y1, x0:x1, :]
+    return cropped_image
+ 
