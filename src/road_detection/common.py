@@ -6,12 +6,13 @@ class AttentionWindow:
     right:int
     top:int
     bottom:int
-    def __init__(self,left:int, right:int, top:int, bottom:int) -> None:
+    def __init__(self,left:int, right:int, top:int, bottom:int, makeMultipleOf8=True) -> None:
         self.left = left
         self.right = right
         self.top = top
         self.bottom = bottom
-        self.makeItMultipleOf8()
+        if makeMultipleOf8:
+            self.makeItMultipleOf8()
 
     def makeItMultipleOf8(self) -> None:
         '''

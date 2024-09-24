@@ -27,8 +27,6 @@ def compute_3d_position_from_disparity(x: float, y: float, disparity: float, fx:
     return [X, Y, Z]
 
 
-
-
 def compute_3d_position_from_disparity_map(x: float, y: float, disparity_map: npt.NDArray[np.float32], fx: float,fy: float, cx: float, cy: float, baseline: float,z0:float) -> Tuple[List[float], float]:
     """
     Compute the 3D position of a point in the disparity map.

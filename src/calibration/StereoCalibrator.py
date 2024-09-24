@@ -137,19 +137,21 @@ class StereoCalibrator:
 
         self.calibration = StereoFullCalibration.from_json (open(self.calibration_file_path, 'r').read())
         if(len(self.calibration.stereo_rectified_tvec)>0):
-            self.estimated_base_line_in_m = -self.calibration.stereo_rectified_tvec[0][0]
+            self.estimated_base_line_in_m = self.calibration.stereo_rectified_tvec[0]
 
-    def compute_mono_chessboard_calibration(self, image_paths:List[str],chessboard_size:cv2.typing.Size,square_size:float)->tuple[float,cv2.typing.MatLike, cv2.typing.MatLike]:
+    def compute_mono_chessboard_calibration(self, image_paths:List[str],chessboard_size:cv2.typing.Size,square_size:float,use_only_front=False)->tuple[float,cv2.typing.MatLike, cv2.typing.MatLike]:
         """
         Compute calibration for monocular chessboard images.
         """
-        self.calibration.mono_K, self.calibration.mono_dist,self.calibration.mono_ret = compute_cube_calibration(image_paths=image_paths, chessboard_size=chessboard_size, square_size=square_size, verbose=self.verbose)
+        self.calibration.mono_K, self.calibration.mono_dist,self.calibration.mono_ret = compute_cube_calibration(image_paths=image_paths, chessboard_size=chessboard_size, square_size=square_size, verbose=self.verbose,use_only_front=use_only_front)
+       
         img = cv2.imread(image_paths[0])
         front_image=get_cube_front_image(img)
         height, width = front_image.shape[:2]
         self.calibration.mono_img_width=width
         self.calibration.mono_img_height=height
         return self.calibration.mono_K, self.calibration.mono_dist,self.calibration.mono_ret
+    
     
     def compute_stereo_chessboard_calibration(self, image_paths_left: List[str], image_paths_right: List[str], chessboard_size:cv2.typing.Size, square_size:float)->None:
         """
@@ -324,7 +326,8 @@ class StereoCalibrator:
                 print(f"Final Reprojection Error Cost: {result.cost/len(all_pts1):.6f}")
                 print(f"Optimality{result.optimality}")
 
-            
+            refined_tvec=refined_tvec.ravel()
+            refined_tvec*=self.estimated_base_line_in_m/refined_tvec[0]
             return K, float(result.cost/len(all_pts1)), refined_rvec, refined_tvec
     
     def compute_global_auto_calibration_undistorted(self,image_paths_left: List[str], 

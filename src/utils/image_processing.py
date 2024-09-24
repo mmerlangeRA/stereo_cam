@@ -1,6 +1,6 @@
-from typing import Tuple
 import cv2
 import numpy as np
+from typing import Tuple
 from sklearn.cluster import KMeans
 from src.road_detection.common import AttentionWindow
 
@@ -19,6 +19,8 @@ def cropToWindow(image:cv2.typing.MatLike, window:AttentionWindow)->cv2.typing.M
     y= window.top
     w=window.right-window.left
     h=window.bottom-window.top
+    if y+h>image.shape[0] or x+w>image.shape[1]:
+        raise ValueError("Window exceeds image dimensions")
     return image[y:y+h, x:x+w]
 
 def reshapeToWindow(image:cv2.typing.MatLike, window:AttentionWindow, max_width:int)->cv2.typing.MatLike:
@@ -150,17 +152,42 @@ def refine_geometrical_shape_in_blob(binary_image: np.array, shape: np.array, ce
 
     return refined_quad
 
-def find_relevant_corners(contour: np.array,nb_sides:int) -> np.array:
+def find_relevant_corners(contour: np.array, nb_sides: int) -> np.array:
     """
-    Finds the nb_sides most relevant corners of a contour that should resemble a quadrilateral.
+    Finds the nb_sides most relevant corners of a contour. If nb_sides is 0, it detects an ellipse
+    and returns the 4 corners of the bounding rectangle.
 
     Parameters:
     - contour: The input contour (numpy array).
-    - nb_sides : The number of sides
+    - nb_sides : The number of sides. If 0, detects an ellipse and returns the 4 corners of the bounding rectangle.
 
     Returns:
-    - A numpy array of shape (nb_sides, 2) containing the nb_sides most relevant corner points.
+    - A numpy array of shape (nb_sides, 2) or (4, 2) if nb_sides is 0, containing the most relevant corner points.
     """
+    if nb_sides == 0:
+        print("detecting ellipse   !!")
+        # Step 1: Fit an ellipse to the contour
+        if len(contour) >= 5:  # Need at least 5 points to fit an ellipse
+            ellipse = cv2.fitEllipse(contour)
+            (x, y), (MA, ma), angle = ellipse  # Get the ellipse parameters
+
+            # Step 2: Find the bounding rectangle of the ellipse
+            bounding_rect = cv2.boundingRect(contour)
+
+            # Step 3: Extract the 4 corners of the bounding rectangle
+            x, y, w, h = bounding_rect
+            rect_corners = np.array([
+                [x, y],           # Top-left
+                [x + w, y],       # Top-right
+                [x + w, y + h],   # Bottom-right
+                [x, y + h]        # Bottom-left
+            ], dtype=np.int32)
+
+            return rect_corners
+
+        else:
+            raise ValueError("Not enough points to fit an ellipse. Contour must have at least 5 points.")
+    
     # Step 1: Get the convex hull of the contour
     hull = cv2.convexHull(contour)
     
@@ -197,8 +224,7 @@ def find_relevant_corners(contour: np.array,nb_sides:int) -> np.array:
     # If fewer than nb_sides points are returned by approx, fallback to the convex hull's nb_sides farthest points
     return cv2.convexHull(contour, returnPoints=True)[:nb_sides].reshape(nb_sides, 2)
 
-
-def detect_sign(disparity_map:cv2.typing.MatLike, window:AttentionWindow,nb_sides:int=4)->Tuple[cv2.typing.MatLike,np.array,np.array] :
+def detect_sign(disparity_map:cv2.typing.MatLike, sign_window:AttentionWindow,nb_sides:int=4)->Tuple[cv2.typing.MatLike,np.array,np.array] :
     """
     Crops the input disparity map image to the specified window, normalizes it, detects the main color,
     and returns a binary black-and-white image corresponding to the cluster with the main color.
@@ -214,7 +240,7 @@ def detect_sign(disparity_map:cv2.typing.MatLike, window:AttentionWindow,nb_side
         - quadrilateral: A quadrilateral bounding the main color blob in the original image coordinates.
     """
     # Step 1: Crop the image to the window
-    cropped_image = cropToWindow(disparity_map, window=window)
+    cropped_image = cropToWindow(disparity_map, window=sign_window)
     
     # Step 2: Normalize the cropped disparity map to the range [0, 255]
     norm_image = cv2.normalize(cropped_image, None, 0, 255, cv2.NORM_MINMAX)
@@ -244,7 +270,7 @@ def detect_sign(disparity_map:cv2.typing.MatLike, window:AttentionWindow,nb_side
         # Step 8: Approximate the contour to a polygon with nb_sides points (a quadrilateral)
         shape_points = find_relevant_corners(largest_contour,nb_sides)
 
-        if len(shape_points) == nb_sides:
+        if nb_sides==0 or len(shape_points) == nb_sides:
             # Refine the quadrilateral so that all points are within the blob
             cx, cy =  np.mean(shape_points, axis=0)
             inside_shape = refine_geometrical_shape_in_blob(binary_image, shape_points, (cx, cy))
@@ -254,7 +280,7 @@ def detect_sign(disparity_map:cv2.typing.MatLike, window:AttentionWindow,nb_side
                 disparities.append(disp)
 
             # Add the offsets to the points of the quadrilateral
-            x_offset, y_offset = window.left, window.top
+            x_offset, y_offset = sign_window.left, sign_window.top
             shape_points[:, 0] += x_offset  # Adjust x-coordinates
             shape_points[:, 1] += y_offset
             shape_center = np.mean(shape_points, axis=0)
