@@ -1,8 +1,10 @@
 import cv2
 import numpy as np
+import numpy.typing as npt
 from typing import Tuple
 from sklearn.cluster import KMeans
 from src.road_detection.common import AttentionWindow
+from src.utils.coordinate_transforms import cartesian_to_spherical_array, spherical_to_equirectangular_array
 
 def cropToWindow(image:cv2.typing.MatLike, window:AttentionWindow)->cv2.typing.MatLike:
     """
@@ -303,3 +305,111 @@ def detect_sign(disparity_map:cv2.typing.MatLike, sign_window:AttentionWindow,nb
     
     # Return only the binary image if no quadrilateral is found
     return binary_image, None, None
+
+import numpy as np
+
+def project_image_to_plane(
+    image_2d: npt.NDArray[np.uint8],
+    plane_center: npt.NDArray[np.float_],
+    plane_normal: npt.NDArray[np.float_],
+    plane_up_vector: npt.NDArray[np.float_],
+    plane_width: float,
+    plane_height: float
+) -> npt.NDArray[np.float_]:
+    """
+    Projects a 2D image onto a plane in 3D space.
+    
+    Parameters:
+    - image_2d: The 2D image as a NumPy array of shape (H, W, C).
+    - plane_center: The center of the plane in 3D space (numpy array of shape (3,)).
+    - plane_normal: The normal vector of the plane (numpy array of shape (3,)).
+    - plane_up_vector: The up vector of the plane (numpy array of shape (3,)).
+    - plane_width: The width of the plane in world units.
+    - plane_height: The height of the plane in world units.
+    
+    Returns:
+    - points_3d: A NumPy array of shape (H, W, 3) containing 3D points on the plane.
+    """
+    H, W = image_2d.shape[:2]
+    
+    # Create local coordinate system for the plane
+    # Step 1: Normalize the plane normal vector
+    plane_normal = plane_normal / np.linalg.norm(plane_normal)
+
+    # Step 2: Orthogonalize the plane up vector with respect to the plane normal
+    plane_up_vector = plane_up_vector - np.dot(plane_up_vector, plane_normal) * plane_normal
+
+    # Step 3: Normalize the adjusted plane up vector
+    plane_up_vector = plane_up_vector / np.linalg.norm(plane_up_vector)
+
+    # Step 4: Compute the plane right vector
+    plane_right_vector = -np.cross(plane_normal, plane_up_vector)
+
+    # Create grid of local coordinates (s, t)
+    s = np.linspace(-plane_width / 2, plane_width / 2, W)
+    t = np.linspace(-plane_height / 2, plane_height / 2, H)
+    s_grid, t_grid = np.meshgrid(s, t)
+
+    # Compute 3D points on the plane
+    points_3d = (plane_center[None, None, :] +
+                 s_grid[:, :, None] * plane_right_vector[None, None, :] +
+                 t_grid[:, :, None] * plane_up_vector[None, None, :])
+
+    return points_3d
+
+
+def map_image_to_equirectangular(
+        image_2d:npt.NDArray[np.uint8], 
+        plane_center:npt.NDArray[np.float_], 
+        plane_normal:npt.NDArray[np.float_],
+        plane_up_vector:npt.NDArray[np.float_],
+        plane_width:float, plane_height:float,
+        equirect_width:int, equirect_height:int
+        )->npt.NDArray[np.uint8]:
+    """
+    Maps a 2D image onto an equirectangular image based on the plane's position and orientation.
+    
+    Parameters:
+    - image_2d: The 2D image as a NumPy array of shape (H, W, C).
+    - plane_center, plane_normal, plane_up_vector, plane_width, plane_height: Parameters defining the plane.
+    - equirect_width, equirect_height: Dimensions of the equirectangular image.
+    
+    Returns:
+    - equirect_image: The equirectangular image with the 2D image projected onto it.
+    """
+    #H, W = image_2d.shape[:2]
+    equirect_image = np.zeros((equirect_height, equirect_width, 3), dtype=np.uint8)
+    
+    # Compute 3D points on the plane
+    points_3d = project_image_to_plane(
+        image_2d, plane_center, plane_normal, plane_up_vector, plane_width, plane_height)
+    x = points_3d[:, :, 0]
+    y = points_3d[:, :, 1]
+    z = points_3d[:, :, 2]
+    
+    # Convert to spherical coordinates
+    _, theta, phi = cartesian_to_spherical_array(x, y, z)
+    
+    # Map to equirectangular coordinates
+    u, v = spherical_to_equirectangular_array(theta, phi, equirect_width, equirect_height)
+    
+    # Flatten arrays for easier indexing
+    u_flat = u.flatten()
+    v_flat = v.flatten()
+    pixels = image_2d.reshape(-1, 3)
+
+    # Round to nearest integer pixel coordinates
+    u_int = np.floor(u_flat).astype(int)
+    v_int = np.floor(v_flat).astype(int)
+
+    # Wrap the u_int values to handle longitude wrapping (modulo operation)
+    u_int = u_int % equirect_width  # Ensures u_int is within [0, equirect_width - 1]
+    v_int = v_int % equirect_height
+    # Clamp the v_int values to the valid range [0, equirect_height - 1]
+    #v_int = np.clip(v_int, 0, equirect_height - 1)
+
+    # Now, no need for valid_mask since u_int and v_int are within valid ranges
+    # Assign pixel values to equirectangular image
+    equirect_image[v_int, u_int] = pixels
+    
+    return equirect_image

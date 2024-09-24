@@ -34,9 +34,12 @@ def main():
     print(args.left_img)
     image1 = cv2.imread(args.left_img)
     image2 = cv2.imread(args.right_img)
+    print("image1",image1.shape)
+    print("image2", image2.shape)
     input = InputPair(left_image=image1,right_image=image2,status="started", calibration=None)
     stereo_output = test_igev.compute_disparity(input)
-    disp = stereo_output.disparity_pixels
+    disparity_map = stereo_output.disparity_pixels
+    print("disparity_map shape",disparity_map.shape)
     output_directory= args.output_directory
 
     if os.path.exists(output_directory) == False:
@@ -69,10 +72,10 @@ def main():
         open(calibration_path, 'w').write(calibration.to_json())
 
     file_stem = os.path.basename(args.left_img).split('.')[0]
-    filename = os.path.join(output_directory, f'{file_stem}_disparity.png')
-    plt.imsave(filename, disp, cmap='jet')
+    filename = os.path.join(output_directory, f'{file_stem}_disparity_map.png')
+    plt.imsave(filename, disparity_map, cmap='jet')
     
-    depth_meters = test_igev.depth_meters_from_disparity(disp, calibration)
+    depth_meters = test_igev.depth_meters_from_disparity(disparity_map, calibration)
     filename = os.path.join(output_directory, f'{file_stem}_depth.png')
     plt.imsave(filename, depth_meters, cmap='jet')
 

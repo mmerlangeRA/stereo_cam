@@ -1,5 +1,6 @@
 from typing import Tuple
 import numpy as np
+import numpy.typing as npt
 import cv2
 
 
@@ -16,6 +17,57 @@ def spherical_to_cartesian(theta: float, phi: float) -> np.ndarray:
     z = np.cos(phi) * np.cos(theta)
     return np.array([x, y, z])
 
+def cartesian_to_spherical(x:float,y:float,z:float) ->  Tuple[float, float,float]:
+    """Convert 3D cartesian coordinates to spherical coordinates ."""
+    r = np.sqrt(x**2 + y**2 + z**2)
+    theta = np.arctan2(z, x)
+    phi = np.arcsin(y / r)
+    return np.array([r,theta, phi])
+
+def spherical_to_equirectangular(theta:float, phi:float, image_width:int, image_height:int) -> Tuple[int, int]:
+    """Convert spherical coordinates to equirectangular pixel coordinates."""
+    u = (theta + np.pi) / (2 * np.pi) * image_width
+    v = (phi + np.pi / 2) / np.pi * image_height
+    return int(u), int(v)
+
+def cartesian_to_equirectangular(x:float, y:float, z:float, image_width:int, image_height:int) -> Tuple[int, int]:
+    """Convert 3D cartesian coordinates to equirectangular pixel coordinates."""
+    _,theta, phi = cartesian_to_spherical(x, y, z)
+    return spherical_to_equirectangular(theta, phi, image_width, image_height)
+
+def cartesian_to_spherical_array(
+        x:npt.NDArray[np.float_], 
+        y:npt.NDArray[np.float_], 
+        z:npt.NDArray[np.float_]
+        )-> Tuple[npt.NDArray[np.float_], npt.NDArray[np.float_], npt.NDArray[np.float_]]:
+    """Convert 3D cartesian coordinates to spherical coordinates for arrays."""
+    r = np.sqrt(x**2 + y**2 + z**2)
+    theta = np.arctan2(x, z) # Azimuth angle
+    phi = np.arcsin(y / r)    # Elevation angle
+    return r, theta, phi
+
+def spherical_to_equirectangular_array(
+    theta: npt.NDArray[np.float_],
+    phi: npt.NDArray[np.float_],
+    image_width: int,
+    image_height: int
+) -> Tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
+    """
+    Convert spherical coordinates to equirectangular pixel coordinates for arrays.
+
+    Parameters:
+    - theta: numpy array of azimuth angles in radians.
+    - phi: numpy array of elevation angles in radians.
+    - image_width: The width of the equirectangular image in pixels.
+    - image_height: The height of the equirectangular image in pixels.
+
+    Returns:
+    - u: numpy array of horizontal pixel coordinates.
+    - v: numpy array of vertical pixel coordinates.
+    """
+    u = ((theta + np.pi)/(2.*np.pi)) * image_width
+    v = (np.pi / 2 - phi) / np.pi * image_height  # Adjusted for image coordinate system
+    return u, v
 
 def get_transformation_matrix(rvec:np.array, tvec:np.array)->np.array:
     R, _ = cv2.Rodrigues(rvec)
@@ -23,7 +75,6 @@ def get_transformation_matrix(rvec:np.array, tvec:np.array)->np.array:
     transformation_matrix[:3, :3] = R
     transformation_matrix[:3, 3] = tvec.flatten()
     return transformation_matrix
-
 
 def get_rvec_tvec_from_transformation_matrix(transformation_matrix:np.array)->Tuple[np.array,np.array]:
     R = transformation_matrix[:3, :3]

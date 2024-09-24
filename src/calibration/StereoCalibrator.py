@@ -8,7 +8,7 @@ import numpy as np
 from src.features_2d.utils import detectAndComputeKPandDescriptors
 from scipy.optimize import least_squares
 
-from src.calibration.cube import compute_cube_calibration, undistort_and_crop
+from src.calibration.cube import compute_cube_calibration, undistort_and_crop, undistort_image
 from src.calibration.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
 from src.utils.cube_image import get_cube_front_image
 from src.utils.path_utils import get_calibration_folder_path, get_static_folder_path
@@ -201,6 +201,10 @@ class StereoCalibrator:
         undistorted_left,newcameramtx = undistort_and_crop(leftImg,self.calibration.mono_K, self.calibration.mono_dist)
         return undistorted_left,newcameramtx
     
+    def undistort(self,leftImg)-> tuple[cv2.typing.MatLike,cv2.typing.MatLike]:
+        undistorted_left = undistort_image(leftImg,self.calibration.mono_K, self.calibration.mono_dist)
+        return undistorted_left
+    
     def compute_global_auto_calibration(self,image_paths_left: List[str], 
                                         image_paths_right: List[str]) -> Tuple[np.ndarray, float, np.ndarray, np.ndarray]:
         """
@@ -353,12 +357,11 @@ class StereoCalibrator:
         self.compute_stereo_rectified_Z0()
         return  K, cost, refined_rvec, refined_tvec
         
-    def compute_stereo_rectified_Z0(self):
+    def compute_stereo_rectified_Z0(self)->None:
         rvec_inv, tvec_inv = invert_rvec_tvec(self.calibration.stereo_rectified_rvec, self.calibration.stereo_rectified_tvec)
         half_rot_y = rvec_inv[1][0]/2.
         half_baseline = self.estimated_base_line_in_m/2.
         self.calibration.stereo_rectified_Z0 = half_baseline * np.tan(np.pi/2.-half_rot_y)
-        print(type(self.calibration.stereo_rectified_Z0))
     
     def compute_auto_calibration_for_2_stereo_standard_images(self,imgLeft:cv2.typing.MatLike, imgRight:cv2.typing.MatLike,verbose=True)-> Tuple[np.ndarray, float, np.ndarray, np.ndarray]:
        
