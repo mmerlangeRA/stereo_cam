@@ -6,6 +6,7 @@ from src.road_detection.common import AttentionWindow
 from scipy.spatial.transform import Rotation as R
 from src.matching.match_simple_pytorch import FeatureExtractor
 from src.utils.equirectangular.equirectangular_mapper import EquirectangularMapper
+from src.utils.equirectangular.SignTools import SignTransform
 
 def compute_error(
     equirect_image: np.ndarray,
@@ -55,7 +56,7 @@ def compute_error(
     return total_error
 
 def optimize_roadsign_position_and_orientation(
-    initial_params: np.ndarray,
+    initial_Transform: SignTransform,
     equirect_image: np.ndarray,
     roadsign_image: np.ndarray,
     bounding_box: AttentionWindow,
@@ -63,7 +64,7 @@ def optimize_roadsign_position_and_orientation(
     plane_height: float,
     equirect_width: int,
     equirect_height: int
-) -> np.ndarray:
+) -> SignTransform:
     """
     Optimizes the position and orientation of the roadsign to minimize the error between the
     projected image and the observed image within the bounding box.
@@ -88,25 +89,13 @@ def optimize_roadsign_position_and_orientation(
         # Unpack parameters
         x, y, z, yaw, pitch, roll = params
         
-        # Create rotation matrix from Euler angles
-        # Note: Euler angles are in radians
-        rotation = R.from_euler('zyx', [roll, pitch, yaw], degrees=False)
-        rotation_matrix = rotation.as_matrix()  # Shape (3, 3)
-        
-        # Define default orientation vectors
-        default_plane_normal = np.array([0, 0, 1], dtype=np.float64)
-        default_plane_up_vector = np.array([0, 1, 0], dtype=np.float64)
-        
-        # Rotate the default vectors
-        plane_normal = rotation_matrix @ default_plane_normal
-        plane_up_vector = rotation_matrix @ default_plane_up_vector
-        
         # Project the roadsign image onto the equirectangular image
         projected_image = equirectangularMapper.map_image_to_equirectangular(
             roadsign_image,
             plane_center=np.array([x, y, z], dtype=np.float64),
-            plane_normal=plane_normal,
-            plane_up_vector=plane_up_vector,
+            yaw=yaw,
+            pitch=pitch,
+            roll=roll,
             plane_width=plane_width,
             plane_height=plane_height
         )
@@ -117,7 +106,7 @@ def optimize_roadsign_position_and_orientation(
         return error
     
     # Initial parameter guess
-    initial_guess = initial_params
+    initial_guess = initial_Transform.as_array()
     
     # Run the optimization
     result = minimize(
@@ -128,4 +117,5 @@ def optimize_roadsign_position_and_orientation(
     )
     
     optimized_params = result.x
-    return optimized_params
+    xc,yc,zc,yaw,pitch, roll = optimized_params
+    return SignTransform(xc,yc,zc,yaw,pitch, roll)

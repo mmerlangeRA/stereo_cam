@@ -52,6 +52,13 @@ class AttentionWindow:
     @property
     def bottom_right(self) -> tuple[int, int]:
         return (self.right, self.bottom)
+    @property
+    def top_center(self) -> tuple[int, int]:
+        return (self.center_x, self.top)
+    
+    @property
+    def bottom_center(self) -> tuple[int, int]:
+        return (self.center_x, self.bottom)
 
     @property
     def area(self) -> int:

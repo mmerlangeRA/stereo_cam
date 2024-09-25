@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import numpy.typing as npt
 from typing import Tuple
-from sklearn.cluster import KMeans
+from scipy.spatial.transform import Rotation as R
 from src.road_detection.common import AttentionWindow
 from src.utils.coordinate_transforms import cartesian_to_spherical_array, spherical_to_equirectangular_array
 
@@ -309,8 +309,9 @@ def detect_sign(disparity_map:cv2.typing.MatLike, sign_window:AttentionWindow,nb
 def project_image_to_plane(
     image_2d: npt.NDArray[np.uint8],
     plane_center: npt.NDArray[np.float_],
-    plane_normal: npt.NDArray[np.float_],
-    plane_up_vector: npt.NDArray[np.float_],
+    yaw:float,
+    pitch:float,
+    roll:float,
     plane_width: float,
     plane_height: float
 ) -> npt.NDArray[np.float_]:
@@ -328,6 +329,10 @@ def project_image_to_plane(
     Returns:
     - points_3d: A NumPy array of shape (H, W, 3) containing 3D points on the plane.
     """
+    rotation = R.from_euler('zxy', [roll, pitch, yaw], degrees=False)
+    rotation_matrix = rotation.as_matrix()
+    plane_normal = rotation_matrix @ np.array([0, 0, -1], dtype=np.float64)
+    plane_up_vector = rotation_matrix @ np.array([0, -1, 0], dtype=np.float64)
     H, W = image_2d.shape[:2]
     
     # Create local coordinate system for the plane
@@ -335,13 +340,14 @@ def project_image_to_plane(
     plane_normal = plane_normal / np.linalg.norm(plane_normal)
 
     # Step 2: Orthogonalize the plane up vector with respect to the plane normal
-    plane_up_vector = plane_up_vector - np.dot(plane_up_vector, plane_normal) * plane_normal
+    # NB: I put a negative sign... but probably a mistake
+    plane_up_vector = -plane_up_vector - np.dot(plane_up_vector, plane_normal) * plane_normal
 
     # Step 3: Normalize the adjusted plane up vector
     plane_up_vector = plane_up_vector / np.linalg.norm(plane_up_vector)
 
     # Step 4: Compute the plane right vector
-    plane_right_vector = -np.cross(plane_normal, plane_up_vector)
+    plane_right_vector = np.cross(plane_normal, plane_up_vector)
 
     # Create grid of local coordinates (s, t)
     s = np.linspace(-plane_width / 2, plane_width / 2, W)

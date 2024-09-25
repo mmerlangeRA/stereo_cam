@@ -57,10 +57,13 @@ class EquirectangularMapper:
     def map_image_to_equirectangular(self,
             image_2d:npt.NDArray[np.uint8], 
             plane_center:npt.NDArray[np.float_], 
-            plane_normal:npt.NDArray[np.float_],
-            plane_up_vector:npt.NDArray[np.float_],
+            yaw:float,
+            pitch:float,
+            roll:float,
             plane_width:float, plane_height:float
             )->npt.NDArray[np.uint8]:
+        
+        
         """
         Maps a 2D image onto an equirectangular image based on the plane's position and orientation.
         
@@ -77,7 +80,7 @@ class EquirectangularMapper:
         
         # Compute 3D points on the plane
         points_3d = project_image_to_plane(
-            image_2d, plane_center, plane_normal, plane_up_vector, plane_width, plane_height)
+            image_2d, plane_center, yaw,pitch, roll, plane_width, plane_height)
         x = points_3d[:, :, 0]
         y = points_3d[:, :, 1]
         z = points_3d[:, :, 2]

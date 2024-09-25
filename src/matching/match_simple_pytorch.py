@@ -2,7 +2,7 @@ import os
 import pickle
 import cv2
 import numpy as np
-from typing import List
+from typing import List, Tuple
 import torch
 import torch.nn as nn
 from torchvision import models, transforms
@@ -11,6 +11,18 @@ import torch.nn.functional as F
 from src.utils.image_processing import crop_transparent_borders, get_transparency_mask
 
 # Define the image preprocessing transformations
+""" 
+preprocess = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],  # ImageNet mean
+        std=[0.229, 0.224, 0.225]     # ImageNet std
+    )
+]) 
+"""
+
 preprocess = transforms.Compose([
     transforms.ToPILImage(),
     transforms.Resize((224, 224)),
@@ -95,10 +107,12 @@ class VGGMatcher:
     reference_image_paths:List[str] = []
     save_path = "reference_data.pk"
     reference_features:List[torch.Tensor] = []
+    force_regenerate: bool = True
 
-    def __init__(self, reference_folder_path,save_name = "reference_data.pk"):
+    def __init__(self, reference_folder_path,save_name = "reference_data.pk", force_regenerate=True):
         self.reference_folder_path = reference_folder_path
         self.save_path = os.path.join(self.reference_folder_path, save_name)
+        self.force_regenerate = force_regenerate
         self.setup_references()
 
     def compute_all_reference_image_paths(self)->None:
@@ -139,7 +153,7 @@ class VGGMatcher:
 
     def setup_references(self)->None:        
         print("setup_references")
-        if os.path.exists(self.save_path) and False:
+        if os.path.exists(self.save_path) and not self.force_regenerate:
             print(f'Loading pickle from {self.save_path}')
             with open(self.save_path, 'rb') as f:
                 self.reference_features, self.reference_image_paths  = pickle.load(f)
@@ -157,7 +171,7 @@ class VGGMatcher:
                 pickle.dump((self.reference_features, self.reference_image_paths ), f)
         return 
 
-    def find_matching(self, query_image: np.ndarray, verbose=False):
+    def find_matching(self, query_image: np.ndarray, verbose=False)->Tuple[int,float]:
         # Extract features for the query image
         feature_extractor = FeatureExtractor()
         query_features = feature_extractor.extract_features(query_image)  # NumPy array of shape (N,)
@@ -195,12 +209,11 @@ class VGGMatcher:
 
         # Find the best match
         best_match_idx = np.argmin(distances_cpu)
-
+        best_match_distance = distances_cpu[best_match_idx]
         if verbose:
-            best_match_distance = distances_cpu[best_match_idx]
             print(f'Best match: {self.reference_image_paths[best_match_idx]} with distance: {best_match_distance}')
 
-        return best_match_idx
+        return best_match_idx, best_match_distance
 
 
     def get_image_path(self, index):

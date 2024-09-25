@@ -20,8 +20,8 @@ def spherical_to_cartesian(theta: float, phi: float) -> np.ndarray:
 def cartesian_to_spherical(x:float,y:float,z:float) ->  Tuple[float, float,float]:
     """Convert 3D cartesian coordinates to spherical coordinates ."""
     r = np.sqrt(x**2 + y**2 + z**2)
-    theta = np.arctan2(z, x)
-    phi = np.arcsin(y / r)
+    theta = np.arctan2(x, z) # Azimuth angle
+    phi = np.arcsin(y / r)    # Elevation angle
     return np.array([r,theta, phi])
 
 def spherical_to_equirectangular(theta:float, phi:float, image_width:int, image_height:int) -> Tuple[int, int]:
@@ -66,7 +66,8 @@ def spherical_to_equirectangular_array(
     - v: numpy array of vertical pixel coordinates.
     """
     u = ((theta + np.pi)/(2.*np.pi)) * image_width
-    v = (np.pi / 2 - phi) / np.pi * image_height  # Adjusted for image coordinate system
+    #v = (np.pi / 2 - phi) / np.pi * image_height  # Adjusted for image coordinate system
+    v = (phi + np.pi / 2) / np.pi * image_height
     return u, v
 
 def get_transformation_matrix(rvec:np.array, tvec:np.array)->np.array:
