@@ -6,7 +6,7 @@ import cv2
 from matplotlib import pyplot as plt
 from src.depth_estimation.selective_igev import Selective_igev
 from src.depth_estimation.depth_estimator import Calibration, InputPair
-from src.calibration.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
+from src.calibration.cube.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
 
 def main():
     parser = argparse.ArgumentParser()

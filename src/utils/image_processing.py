@@ -4,7 +4,7 @@ import numpy.typing as npt
 from typing import Tuple
 from scipy.spatial.transform import Rotation as R
 from src.road_detection.common import AttentionWindow
-from src.utils.coordinate_transforms import cartesian_to_spherical_array, spherical_to_equirectangular_array
+
 
 def cropToWindow(image:cv2.typing.MatLike, window:AttentionWindow)->cv2.typing.MatLike:
     """

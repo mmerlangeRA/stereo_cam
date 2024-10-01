@@ -5,7 +5,7 @@ from python_server.utils.path_helper import get_uploaded_photos_path
 from src.triangulate.main import rotation_matrix_from_params,get_3d_point_cam1_2_from_coordinates
 from pydantic import BaseModel, Field
 from python_server.settings.settings import settings
-from src.calibration.eac import calibrate_left_right
+from src.calibration.equirectangular.main import auto_compute_cam2_transform
 
 class TriangulationRequest(BaseModel):
     keypoints_cam1: Tuple[float, float] = Field(..., example=(0, 0))
@@ -41,7 +41,7 @@ def auto_calibrate_equipoloar(request:AutoCalibrationRequest, verbose=False)->Li
     except Exception as e:
         raise FileNotFoundError(f"right_image not found{e}")
 
-    best_results = calibrate_left_right(left_image, right_image, request.initial_params, request.bnds,request.inlier_threshold,verbose=verbose)
+    best_results = auto_compute_cam2_transform(left_image, right_image, request.initial_params, request.bnds,request.inlier_threshold,verbose=verbose)
     optimized_params = best_results["params"]
     if isinstance(optimized_params, np.ndarray):
         optimized_params = optimized_params.tolist()

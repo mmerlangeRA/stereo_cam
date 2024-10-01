@@ -3,8 +3,9 @@ import numpy as np
 import numpy.typing as npt
 from typing import Tuple
 from src.road_detection.common import AttentionWindow
-from src.utils.coordinate_transforms import cartesian_to_spherical_array, spherical_to_equirectangular_array
+
 from src.utils.image_processing import project_image_to_plane
+from src.utils.coordinate_transforms import cartesian_to_spherical, spherical_to_equirectangular
 
 class EquirectangularMapper:
 
@@ -35,10 +36,10 @@ class EquirectangularMapper:
         self.equirect_image.fill(0)
 
         # Convert 3D points to spherical coordinates
-        _, theta, phi = cartesian_to_spherical_array(points_3d[:, 0], points_3d[:, 1], points_3d[:, 2])
+        _, theta, phi = cartesian_to_spherical(points_3d[:, 0], points_3d[:, 1], points_3d[:, 2])
 
         # Map to equirectangular coordinates
-        u, v = spherical_to_equirectangular_array(theta, phi, self.equirect_width, self.equirect_height)
+        u, v = spherical_to_equirectangular(theta, phi, self.equirect_width, self.equirect_height)
 
         # Flatten arrays for easier indexing
         u_flat = u.flatten()
@@ -86,10 +87,10 @@ class EquirectangularMapper:
         z = points_3d[:, :, 2]
         
         # Convert to spherical coordinates
-        _, theta, phi = cartesian_to_spherical_array(x, y, z)
+        _, theta, phi = cartesian_to_spherical(x, y, z)
         
         # Map to equirectangular coordinates
-        u, v = spherical_to_equirectangular_array(theta, phi, self.equirect_width, self.equirect_height)
+        u, v = spherical_to_equirectangular(theta, phi, self.equirect_width, self.equirect_height)
         
         # Flatten arrays for easier indexing
         u_flat = u.flatten()

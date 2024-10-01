@@ -6,7 +6,7 @@ import cv2
 from src.calibration.cube.cube import load_calibration_params, save_calibration_params
 from src.calibration.equirectangular.main import auto_compute_cam2_transform, getRefinedTransformFromKPMatching
 from src.utils.TransformClass import TransformBounds, Transform
-from src.utils.path_utils import get_data_path
+from src.utils.path_utils import get_data_path, get_ouput_path
 from src.triangulate.main import get_3d_point_cam1_2_from_coordinates, rotation_matrix_from_params
 
 
@@ -148,8 +148,8 @@ def generate_all_calibrations(initialTransform:Transform,transformBounds:Transfo
 
     array_calibration = {}
     photo_folder_path = get_data_path('Photos')
-    for photo in range(0,6):
-        for angle in range(0, 3):
+    for photo in range(5,6):
+        for angle in range(2, 3):
             img_folder = os.path.join(photo_folder_path, 'P'+str(photo))
             left_image_path = 'D_P'+str(photo)+'_CAM_G_'+str(angle)+'_EAC.png'
             right_image_path = 'D_P'+str(photo)+'_CAM_D_'+str(angle)+'_EAC.png'
@@ -194,7 +194,7 @@ def compute_results(data):
         optimized_params = load_calibration_params(file_name)
         optimized_R = rotation_matrix_from_params(optimized_params[3:])
         optimized_t = optimized_params[:3]
-        optimized_t*=1.12/optimized_t[0]
+        optimized_t*=1.125/optimized_t[0]
         image_width = d["image_width"]
         image_height = d["image_height"]
         p1_top,p2_top,residual_distance_normalized = get_3d_point_cam1_2_from_coordinates(tuple(d["keypoints_top"][0]), tuple(d["keypoints_top"][1]), image_width, image_height, optimized_R, optimized_t, False)
@@ -206,6 +206,7 @@ def compute_results(data):
         panneau_height_2=p2_top[1]
         panneau_height=(panneau_height_1+panneau_height_2)/2
         array_result[id]=[panneau_size,panneau_height_1]
+        print(optimized_params)
         print(f'panneau size {np.linalg.norm(panneau_size)}')
         print(f'panneau height {panneau_height_1} {panneau_height_2} {panneau_height}')
         print(f'p1_top {p1_top}')
@@ -213,7 +214,7 @@ def compute_results(data):
         print("\n")
     
     csv_data = [{"id": key, "taille": value[0], "hauteur": value[1]} for key, value in array_result.items()]
-    csv_file = f'resultats.csv'
+    csv_file =get_ouput_path('resultats.csv')
     with open(csv_file, mode='w', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=["id", "taille", "hauteur"])
         writer.writeheader()
