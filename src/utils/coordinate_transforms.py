@@ -1,28 +1,148 @@
-from typing import Tuple
+from typing import Tuple, Union
 import numpy as np
 import numpy.typing as npt
 import cv2
 
+import numpy as np
+from typing import Union, Tuple
 
-def pixel_to_spherical(image_width: int, image_height: int, pixel_x: int, pixel_y: int) -> Tuple[float, float]:
-    """Convert pixel coordinates to spherical coordinates (theta, phi)."""
-    theta = (pixel_x / image_width) * 2 * np.pi - np.pi # longitude
-    phi = (pixel_y / image_height) * np.pi - np.pi / 2 # latitude
+def pixel_to_spherical(image_width: int, image_height: int, pixel_x: Union[int, np.ndarray], pixel_y: Union[int, np.ndarray]) -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray]]:
+    """
+    Convert pixel coordinates to spherical coordinates (theta, phi).
+    
+    This function handles both single pixel coordinates and arrays of pixel coordinates.
+
+    Parameters:
+    - image_width: Width of the equirectangular image.
+    - image_height: Height of the equirectangular image.
+    - pixel_x: Int or NumPy array of x pixel coordinates.
+    - pixel_y: Int or NumPy array of y pixel coordinates.
+
+    Returns:
+    - theta: Float or NumPy array of longitude angles (theta).
+    - phi: Float or NumPy array of latitude angles (phi).
+    """
+    # Handle scalar inputs
+    if np.isscalar(pixel_x) and np.isscalar(pixel_y):
+        theta = (pixel_x / image_width) * 2 * np.pi - np.pi  # Longitude
+        phi = (pixel_y / image_height) * np.pi - np.pi / 2   # Latitude
+        return theta, phi
+
+    # Ensure pixel_x and pixel_y are NumPy arrays for vectorized operations
+    pixel_x = np.asarray(pixel_x)
+    pixel_y = np.asarray(pixel_y)
+
+    # Compute theta (longitude) and phi (latitude) for arrays of pixel coordinates
+    theta = (pixel_x / image_width) * 2 * np.pi - np.pi  # Longitude
+    phi = (pixel_y / image_height) * np.pi - np.pi / 2   # Latitude
+
     return theta, phi
 
-def spherical_to_cartesian(theta: float, phi: float) -> np.ndarray:
-    """Convert spherical coordinates to 3D cartesian coordinates."""
+def spherical_to_cartesian(theta: Union[float, np.ndarray], phi: Union[float, np.ndarray]) -> np.ndarray:
+    """
+    Convert spherical coordinates to 3D cartesian coordinates.
+    
+    This function handles both single float inputs and arrays of inputs.
+
+    Parameters:
+    - theta: Float or NumPy array of longitude angles (theta).
+    - phi: Float or NumPy array of latitude angles (phi).
+
+    Returns:
+    - A NumPy array containing the (x, y, z) cartesian coordinates.
+      If the inputs are scalars, the output will be a 1D array.
+      If the inputs are arrays, the output will be a 2D array of shape (N, 3), where N is the number of points.
+    """
+    # Handle scalar inputs
+    if np.isscalar(theta) and np.isscalar(phi):
+        x = np.cos(phi) * np.sin(theta)
+        y = np.sin(phi)
+        z = np.cos(phi) * np.cos(theta)
+        return np.array([x, y, z])
+    
+    # Ensure theta and phi are NumPy arrays for vectorized operations
+    theta = np.asarray(theta)
+    phi = np.asarray(phi)
+
+    # Compute x, y, z for each spherical coordinate
     x = np.cos(phi) * np.sin(theta)
     y = np.sin(phi)
     z = np.cos(phi) * np.cos(theta)
-    return np.array([x, y, z])
 
-def cartesian_to_spherical(x:float,y:float,z:float) ->  Tuple[float, float,float]:
+    # Stack x, y, z into a single array with shape (N, 3)
+    cartesian_coords = np.stack((x, y, z), axis=-1)
+
+    return cartesian_coords
+
+def pixel_to_cartesian(image_width: int, image_height: int, pixel_x: Union[float, np.ndarray], pixel_y: Union[float, np.ndarray]) -> np.ndarray:
+    """
+    Convert pixel coordinates to 3D cartesian coordinates.
+
+    Parameters:
+    - image_width: Width of the image.
+    - image_height: Height of the image.
+    - pixel_x: x-coordinate of the pixel(s). Can be a single integer or a NumPy array.
+    - pixel_y: y-coordinate of the pixel(s). Can be a single integer or a NumPy array.
+
+    Returns:
+    - Cartesian coordinates as NumPy array(s). If input is scalar, output is (3,) array. 
+      If input is array, output is (N, 3) array.
+    """
+    # Check if input is a scalar or an array
+    is_scalar = np.isscalar(pixel_x) and np.isscalar(pixel_y)
+    
+    # If inputs are scalars, make them arrays for consistent processing
+    if is_scalar:
+        pixel_x = np.array([pixel_x])
+        pixel_y = np.array([pixel_y])
+
+    # Compute theta and phi for either single pixel or array of pixels
+    theta, phi = pixel_to_spherical(image_width, image_height, pixel_x, pixel_y)
+    
+    # Convert spherical coordinates to cartesian coordinates
+    cartesian_coords = spherical_to_cartesian(theta, phi)
+    
+    # If inputs were scalars, return a (3,) array, otherwise return (N, 3) array
+    return cartesian_coords[0] if is_scalar else cartesian_coords
+
+def cartesian_to_spherical_old(x:float,y:float,z:float) ->  Tuple[float, float,float]:
     """Convert 3D cartesian coordinates to spherical coordinates ."""
     r = np.sqrt(x**2 + y**2 + z**2)
     theta = np.arctan2(x, z) # Azimuth angle
     phi = np.arcsin(y / r)    # Elevation angle
     return np.array([r,theta, phi])
+
+def cartesian_to_spherical(x: Union[float, np.ndarray], y: Union[float, np.ndarray], z: Union[float, np.ndarray]) -> Union[Tuple[float, float, float], Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """
+    Convert 3D cartesian coordinates to spherical coordinates.
+
+    Parameters:
+    - x: X coordinate (can be scalar or array).
+    - y: Y coordinate (can be scalar or array).
+    - z: Z coordinate (can be scalar or array).
+
+    Returns:
+    - Tuple of (r, theta, phi):
+      - r: Radial distance (same shape as input).
+      - theta: Azimuth angle (same shape as input).
+      - phi: Elevation angle (same shape as input).
+    """
+    # Convert inputs to arrays if they aren't already
+    x = np.asarray(x)
+    y = np.asarray(y)
+    z = np.asarray(z)
+
+    # Compute r, theta, phi
+    r = np.sqrt(x**2 + y**2 + z**2)
+    theta = np.arctan2(x, z)  # Azimuth angle
+    phi = np.arcsin(y / r)    # Elevation angle
+
+    # Return single value if inputs were scalars, else return arrays
+    if r.size == 1:
+        return float(r), float(theta), float(phi)
+    else:
+        return r, theta, phi
+
 
 def spherical_to_equirectangular(theta:float, phi:float, image_width:int, image_height:int) -> Tuple[int, int]:
     """Convert spherical coordinates to equirectangular pixel coordinates."""
@@ -30,45 +150,48 @@ def spherical_to_equirectangular(theta:float, phi:float, image_width:int, image_
     v = (phi + np.pi / 2) / np.pi * image_height
     return int(u), int(v)
 
-def cartesian_to_equirectangular(x:float, y:float, z:float, image_width:int, image_height:int) -> Tuple[int, int]:
+
+def spherical_to_equirectangular(
+    theta: Union[float, np.ndarray], 
+    phi: Union[float, np.ndarray], 
+    image_width: int, 
+    image_height: int
+) -> Union[Tuple[int, int], Tuple[np.ndarray, np.ndarray]]:
+    """
+    Convert spherical coordinates to equirectangular pixel coordinates.
+    
+    Parameters:
+    - theta: Longitude angle(s) in radians (can be scalar or array).
+    - phi: Latitude angle(s) in radians (can be scalar or array).
+    - image_width: Width of the equirectangular image in pixels.
+    - image_height: Height of the equirectangular image in pixels.
+
+    Returns:
+    - u, v: Equirectangular pixel coordinates (as int if scalar inputs, or arrays if input is array).
+    """
+    # Ensure theta and phi are arrays for vectorized operations
+    theta = np.asarray(theta)
+    phi = np.asarray(phi)
+
+    # Compute equirectangular pixel coordinates
+    u = (theta + np.pi) / (2 * np.pi) * image_width
+    v = (phi + np.pi / 2) / np.pi * image_height
+
+    # Convert to integers
+    u_int = np.floor(u).astype(int)
+    v_int = np.floor(v).astype(int)
+
+    # If inputs were scalars, return as scalars
+    if u_int.size == 1:
+        return int(u_int), int(v_int)
+    else:
+        return u_int, v_int
+
+
+def cartesian_to_equirectangular(x:Union[float, np.ndarray], y:Union[float, np.ndarray], z:Union[float, np.ndarray], image_width:int, image_height:int) -> Tuple[int, int]:
     """Convert 3D cartesian coordinates to equirectangular pixel coordinates."""
     _,theta, phi = cartesian_to_spherical(x, y, z)
     return spherical_to_equirectangular(theta, phi, image_width, image_height)
-
-def cartesian_to_spherical_array(
-        x:npt.NDArray[np.float_], 
-        y:npt.NDArray[np.float_], 
-        z:npt.NDArray[np.float_]
-        )-> Tuple[npt.NDArray[np.float_], npt.NDArray[np.float_], npt.NDArray[np.float_]]:
-    """Convert 3D cartesian coordinates to spherical coordinates for arrays."""
-    r = np.sqrt(x**2 + y**2 + z**2)
-    theta = np.arctan2(x, z) # Azimuth angle
-    phi = np.arcsin(y / r)    # Elevation angle
-    return r, theta, phi
-
-def spherical_to_equirectangular_array(
-    theta: npt.NDArray[np.float_],
-    phi: npt.NDArray[np.float_],
-    image_width: int,
-    image_height: int
-) -> Tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
-    """
-    Convert spherical coordinates to equirectangular pixel coordinates for arrays.
-
-    Parameters:
-    - theta: numpy array of azimuth angles in radians.
-    - phi: numpy array of elevation angles in radians.
-    - image_width: The width of the equirectangular image in pixels.
-    - image_height: The height of the equirectangular image in pixels.
-
-    Returns:
-    - u: numpy array of horizontal pixel coordinates.
-    - v: numpy array of vertical pixel coordinates.
-    """
-    u = ((theta + np.pi)/(2.*np.pi)) * image_width
-    #v = (np.pi / 2 - phi) / np.pi * image_height  # Adjusted for image coordinate system
-    v = (phi + np.pi / 2) / np.pi * image_height
-    return u, v
 
 def get_transformation_matrix(rvec:np.array, tvec:np.array)->np.array:
     R, _ = cv2.Rodrigues(rvec)

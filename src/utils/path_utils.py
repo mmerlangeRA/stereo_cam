@@ -1,20 +1,46 @@
 import os
 from typing import List
 import cv2
+import sys
 from src.utils.cube_image import get_cube_front_image
 
+gettrace = getattr(sys, 'gettrace', None)
+debug_monde = False
+if gettrace is None:
+    print('No sys.gettrace')
+elif gettrace():
+    debug_monde = True
+    print('Debugging mode')
+else:
+    print("Standard mode")
+
 def get_root() -> str:
-    #return os.getcwd() 
-    return r'C:\Users\mmerl\projects\stereo_cam'
+    if debug_monde:
+        return r'C:\Users\mmerl\projects\stereo_cam'
+    return os.getcwd() 
+
+def get_data_path(path="") -> str:
+    data_folder_path = os.path.join(get_root(), "data")
+    if not os.path.exists(data_folder_path):
+        os.makedirs(data_folder_path)
+    data_path= os.path.join(data_folder_path, path)
+    return data_path
+
+def get_ouput_path(path="") -> str:
+    output_folder_path = os.path.join(get_root(), "output")
+    if not os.path.exists(output_folder_path):
+        os.makedirs(output_folder_path)
+    output_path= os.path.join(output_folder_path, path)
+    return output_path
 
 def get_pretrained_model_path(lib:str,model:str) -> str:
-    return os.path.join(get_root(), "pretrained_models",lib,model)
+    return os.path.join(get_data_path(), "pretrained_models",lib,model)
 
 def get_static_folder_path(path="") -> str:
     return os.path.join(get_root(), "static",path)
 
 def get_calibration_folder_path(path="") -> str:
-    return os.path.join(get_root(), "calibration", path)
+    return os.path.join(get_data_path(), "calibration", path)
 
 def find_images_paths_in_folder(root_dir, extensions=[".png",".jpg",".jpeg"])->List[str]: 
     image_files = []

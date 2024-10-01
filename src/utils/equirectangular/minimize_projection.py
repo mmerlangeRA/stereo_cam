@@ -6,7 +6,7 @@ from src.road_detection.common import AttentionWindow
 from scipy.spatial.transform import Rotation as R
 from src.matching.match_simple_pytorch import FeatureExtractor
 from src.utils.equirectangular.equirectangular_mapper import EquirectangularMapper
-from src.utils.equirectangular.SignTools import SignTransform
+from src.utils.TransformClass import Transform
 
 def compute_error(
     equirect_image: np.ndarray,
@@ -56,7 +56,7 @@ def compute_error(
     return total_error
 
 def optimize_roadsign_position_and_orientation(
-    initial_Transform: SignTransform,
+    initial_Transform: Transform,
     equirect_image: np.ndarray,
     roadsign_image: np.ndarray,
     bounding_box: AttentionWindow,
@@ -64,7 +64,7 @@ def optimize_roadsign_position_and_orientation(
     plane_height: float,
     equirect_width: int,
     equirect_height: int
-) -> SignTransform:
+) -> Transform:
     """
     Optimizes the position and orientation of the roadsign to minimize the error between the
     projected image and the observed image within the bounding box.
@@ -118,4 +118,4 @@ def optimize_roadsign_position_and_orientation(
     
     optimized_params = result.x
     xc,yc,zc,yaw,pitch, roll = optimized_params
-    return SignTransform(xc,yc,zc,yaw,pitch, roll)
+    return Transform(xc,yc,zc,yaw,pitch, roll)

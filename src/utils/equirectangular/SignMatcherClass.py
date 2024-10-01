@@ -2,15 +2,16 @@ from typing import Tuple
 import cv2
 import numpy as np
 import numpy.typing as npt
-from scipy.spatial.transform import Rotation as R
 
-from python_server.utils.path_helper import get_static_path
+
 from src.road_detection.common import AttentionWindow
 from src.utils.coordinate_transforms import cartesian_to_equirectangular, cartesian_to_spherical, pixel_to_spherical, spherical_to_cartesian
 from src.matching.match_simple_pytorch import VGGMatcher
 from src.utils.equirectangular.equirectangular_mapper import EquirectangularMapper
 from src.utils.equirectangular.minimize_projection import  optimize_roadsign_position_and_orientation
-from src.utils.equirectangular.SignTools import SignMatcherTool, SignTransform
+from src.utils.equirectangular.SignTools import SignMatcherTool
+from src.utils.TransformClass import Transform
+from src.utils.path_utils import get_data_path
 
 class SignMatcher:
 
@@ -18,7 +19,7 @@ class SignMatcher:
     estimated_sign_height = 0.7
     equirectangularMapper: EquirectangularMapper = None
 
-    def __init__(self,reference_folder_path:str=r'C:\Users\mmerl\projects\stereo_cam\panneaux' ) -> None:
+    def __init__(self,reference_folder_path:str=get_data_path('panneaux') ) -> None:
         self.matcher = VGGMatcher(reference_folder_path)
 
     def get_equiRectangularMapper(self,equi_width:int,equi_height:int )->EquirectangularMapper:
@@ -43,7 +44,7 @@ class SignMatcher:
     def get_signImage_from_id(self, id:int)->npt.NDArray[np.uint8]:
         return cv2.imread(self.matcher.get_image_path(id))
     
-    def estimate_initial_sign_transform(self, equirect_image:npt.NDArray[np.uint8],signWindow:AttentionWindow, signImage:npt.NDArray[np.uint8] ,debug=False)->SignTransform:
+    def estimate_initial_sign_transform(self, equirect_image:npt.NDArray[np.uint8],signWindow:AttentionWindow, signImage:npt.NDArray[np.uint8] ,debug=False)->Transform:
 
         signMatcherTool=SignMatcherTool()
         
@@ -114,20 +115,20 @@ class SignMatcher:
         roll_estimate= 0.
         roll_estimate = 0.
 
-        estimated_sign_transform = SignTransform(x_c, y_c, z_c, yaw_estimate, pitch_estimate, roll_estimate)
+        estimated_sign_transform = Transform(x_c, y_c, z_c, yaw_estimate, pitch_estimate, roll_estimate)
 
         if debug:
             print(f"estimated_sign_transform {estimated_sign_transform}")
 
         return estimated_sign_transform
     
-    def optimize_sign_position_and_orientation(self, equirect_image:npt.NDArray[np.uint8],sign_img: npt.NDArray[np.uint8], signWindow:AttentionWindow, estimatedSignTransform:SignTransform)->SignTransform:
+    def optimize_sign_position_and_orientation(self, equirect_image:npt.NDArray[np.uint8],sign_img: npt.NDArray[np.uint8], signWindow:AttentionWindow, estimatedTransform:Transform)->Transform:
         h,w=sign_img.shape[:2]
         plane_height = self.estimated_sign_height
         plane_width = plane_height*w/h
         equirect_height, equirect_width = equirect_image.shape[:2]
-        optimizedSignTransform = optimize_roadsign_position_and_orientation(
-            estimatedSignTransform,
+        optimizedTransform = optimize_roadsign_position_and_orientation(
+            estimatedTransform,
             equirect_image,
             sign_img,
             signWindow,
@@ -137,17 +138,16 @@ class SignMatcher:
             equirect_height
         )
 
-        return optimizedSignTransform
+        return optimizedTransform
     
-    def get_top_bottom_projected(self,signImage:npt.NDArray[np.uint8],signTransform:SignTransform, equi_width:int, equi_height:int):
+    def get_top_bottom_projected(self,signImage:npt.NDArray[np.uint8],signTransform:Transform, equi_width:int, equi_height:int):
         equirectangularMapper = self.get_equiRectangularMapper(equi_width,equi_height)
         plane_height = self.estimated_sign_height
         h,w = signImage.shape[:2]
 
         optimized_plane_center = np.array([signTransform.xc, signTransform.yc, signTransform.zc], dtype=np.float64)
         # Recompute rotation matrix and orientation vectors
-        rotation = R.from_euler('zxy', [signTransform.roll, signTransform.pitch, signTransform.yaw], degrees=False)
-        rotation_matrix = rotation.as_matrix()
+        rotation_matrix = signTransform.rotationMatrix
 
         optimized_plane_up_vector = rotation_matrix @ np.array([0, 1, 0], dtype=np.float64)
         plane_up_vector_rotated = rotation_matrix @ optimized_plane_up_vector
@@ -160,7 +160,7 @@ class SignMatcher:
         us,vs = equirectangularMapper.map_3d_points_to_equirectangular(points_3D)
         return us,vs
     
-    def map_to_equirectangular(self, signTransform:SignTransform,signImage:npt.NDArray[np.uint8],equi_width:int,equi_height:int,estimated_sign_height:float=-1)->np.ndarray:
+    def map_to_equirectangular(self, signTransform:Transform,signImage:npt.NDArray[np.uint8],equi_width:int,equi_height:int,estimated_sign_height:float=-1)->np.ndarray:
         equirectangularMapper = self.get_equiRectangularMapper(equi_width,equi_height)
         
         if estimated_sign_height > 0.:
