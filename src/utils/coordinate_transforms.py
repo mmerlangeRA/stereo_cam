@@ -155,7 +155,8 @@ def spherical_to_equirectangular(
     theta: Union[float, np.ndarray], 
     phi: Union[float, np.ndarray], 
     image_width: int, 
-    image_height: int
+    image_height: int,
+    to_int = True
 ) -> Union[Tuple[int, int], Tuple[np.ndarray, np.ndarray]]:
     """
     Convert spherical coordinates to equirectangular pixel coordinates.
@@ -177,6 +178,7 @@ def spherical_to_equirectangular(
     u = (theta + np.pi) / (2 * np.pi) * image_width
     v = (phi + np.pi / 2) / np.pi * image_height
 
+    if not to_int: return u, v
     # Convert to integers
     u_int = np.floor(u).astype(int)
     v_int = np.floor(v).astype(int)
@@ -188,10 +190,10 @@ def spherical_to_equirectangular(
         return u_int, v_int
 
 
-def cartesian_to_equirectangular(x:Union[float, np.ndarray], y:Union[float, np.ndarray], z:Union[float, np.ndarray], image_width:int, image_height:int) -> Tuple[int, int]:
+def cartesian_to_equirectangular(x:Union[float, np.ndarray], y:Union[float, np.ndarray], z:Union[float, np.ndarray], image_width:int, image_height:int,to_int=True) -> Tuple[int, int]:
     """Convert 3D cartesian coordinates to equirectangular pixel coordinates."""
     _,theta, phi = cartesian_to_spherical(x, y, z)
-    return spherical_to_equirectangular(theta, phi, image_width, image_height)
+    return spherical_to_equirectangular(theta, phi, image_width, image_height,to_int=to_int)
 
 def get_transformation_matrix(rvec:np.array, tvec:np.array)->np.array:
     R, _ = cv2.Rodrigues(rvec)

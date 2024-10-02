@@ -329,7 +329,7 @@ def project_image_to_plane(
     Returns:
     - points_3d: A NumPy array of shape (H, W, 3) containing 3D points on the plane.
     """
-    rotation = R.from_euler('xyz', [pitch,roll, yaw], degrees=False)
+    rotation = R.from_euler('xyz', [pitch,yaw,roll], degrees=False)
     rotation_matrix = rotation.as_matrix()
     plane_normal = rotation_matrix @ np.array([0, 0, -1], dtype=np.float64)
     plane_up_vector = rotation_matrix @ np.array([0, -1, 0], dtype=np.float64)

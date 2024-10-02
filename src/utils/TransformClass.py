@@ -31,6 +31,21 @@ class Transform:
         self.roll
     ])
 
+    def as_params(self)->np.array:
+       return np.array([
+        self.yc,
+        self.zc,
+        self.pitch,
+        self.yaw,
+        self.roll
+    ])
+
+    def scale_translation_from_x(self, baseline:float)->None:
+        ratio = baseline/self.xc
+        self.xc *= ratio
+        self.yc *= ratio
+        self.zc *= ratio
+        
     @property
     def rotationMatrix(self)->np.array:
         rotation = R.from_euler('xyz', [self.pitch,self.yaw,self.roll ], degrees=False)
@@ -45,14 +60,14 @@ class Transform:
 @dataclass
 class TransformBounds:
     baseline:float
-    baseline_max_delta:float
-    dt_max: float
+    dt_max_y:float
+    dt_max_z: float
     angle_max: float
 
-    def __init__(self, baseline, baseline_max_delta, dt_max, angle_max):
+    def __init__(self, baseline, dt_max_y,dt_max_z, angle_max):
         self.baseline = baseline
-        self.baseline_max_delta = baseline_max_delta
-        self.dt_max = dt_max
+        self.dt_max_y = dt_max_y
+        self.dt_max_z = dt_max_z
         self.angle_max = angle_max  
 
     def get_bounds(self) -> Tuple[Tuple[float, float], ...]:
@@ -64,16 +79,14 @@ class TransformBounds:
             for a particular parameter.
         """
         # Translation bounds
-        tx_bounds = (self.baseline-self.baseline_max_delta, self.baseline+self.baseline_max_delta)  # t_x is known to be within this range
-        ty_bounds = (-self.dt_max, self.dt_max)
-        tz_bounds = (-self.dt_max, self.dt_max)
+        ty_bounds = (-self.dt_max_y, self.dt_max_y)
+        tz_bounds = (-self.dt_max_z, self.dt_max_z)
 
         # Rotation bounds (in radians)
         roll_bounds = (-self.angle_max, self.angle_max)
         pitch_bounds = (-self.angle_max, self.angle_max)
         yaw_bounds = (-self.angle_max, self.angle_max)
         bounds = (
-            tx_bounds,
             ty_bounds,
             tz_bounds,
             roll_bounds,

@@ -9,11 +9,11 @@ from src.utils.cube_image import get_cube_front_image, get_cube_sub_images
 
 calibration_folder = "calibration"
 
-def save_calibration_params(params, filename:str)->None:
-    np.savetxt(filename+'.csv', params, delimiter=',')
+def save_calibration_params(params, filepath:str)->None:
+    np.savetxt(filepath, params, delimiter=',')
 
-def load_calibration_params(filename:str)->np.ndarray[float]:
-    loaded =np.loadtxt(filename+'.csv', delimiter=',')
+def load_calibration_params(filepath:str)->np.ndarray[float]:
+    loaded =np.loadtxt(filepath, delimiter=',')
     return loaded
 
 def save_calibration(mtx, dist, rmse,fname="calibration_matrix.yaml")->None:

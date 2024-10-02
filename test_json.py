@@ -30,16 +30,16 @@ frames =[
         "imgLeft":r"C:\Users\mmerl\projects\stereo_cam\data\Photos\test\image_L_21_20240730_143131_519000_2301.jpg",
         "imgRight":r"C:\Users\mmerl\projects\stereo_cam\data\Photos\test\image_R_21_20240730_143124_315000_2014.jpg",
         "keypoints_camL": [ 
-             [3357.0,1272.0],
-            [3426.0, 1272.0],
-            [3357.0,1341.0],
-            [3426.0, 1341.0]
+             [3360.0,1275.0],
+            [3423.0, 1275.0],
+            [3423.0,1338.0],
+            [3360.0, 1338.0]
         ],
         "keypoints_camR": [
-             [3414.0, 1276.0],
-             [3477.0,1276.0],
-             [3414.0, 1341.0],
-             [3477.0,1341.0]
+             [3416.0, 1278.0],
+             [3476.0,1278.0],
+             [3476.0, 1338.0],
+             [3416.0,1338.0]
         ]
     },
     {
@@ -47,16 +47,16 @@ frames =[
         "imgLeft":r"C:\Users\mmerl\projects\stereo_cam\data\Photos\test\image_L_65_20240730_143131_519000_3022.jpg",
         "imgRight":r"C:\Users\mmerl\projects\stereo_cam\data\Photos\test\image_R_65_20240730_143124_315000_2591.jpg",
         "keypoints_camL": [ 
-            [3047.0,1482.0],
-            [3133.0, 1482.0],
-            [3047.0,1576.0],
-            [3133.0, 1576.0]
+            [3050.0,1485.0],
+            [3131.0, 1485.0],
+            [3131.0,1573.0],
+            [3050.0, 1573.0]
         ],
         "keypoints_camR": [
-             [3206.0, 1460.0],
-             [3274.0,1460.0],
-             [3206.0, 1542.0],
-             [3274.0,1542.0]
+             [3209.0, 1463.0],
+             [3270.0,1460.0],
+             [3270.0, 1538.0],
+             [3209.0,1538.0]
         ]
     },   
     {
@@ -131,6 +131,7 @@ frames =[
     },
 ]
 
+frames=[frames[1]]
 
 image_width =5376 
 image_height= 2688 
@@ -138,62 +139,54 @@ image_height= 2688
 invert_left_right = True
 
 optimize_global= True
-
-initial_params =[0, 0, 0, 1.12, 0, 0]
-bnds =[[1.11, 1.13], [-0.52001, 0.52001], [-0.72001, 0.72001],[-0.17, 0.17], [-0.17, 0.17], [-0.17, 0.17]]
 inlier_threshold = 0.001
+base_line=1.125
+angle_max = np.pi*5./180.
+dt_max_y = 0.05
+dt_max_z= 0.7
+default_transform = Transform(base_line, 0., 0., 0., 0., 0.)
+best_results = Transform(base_line,0.,0.,0.,0.,0.)
+estimated_transform = Transform(xc=1.1100000000010084, yc=-0.015367638222386357, zc=0.026834207520040555, pitch=0.023162473327744338, yaw=0.07609111219036904, roll=0.009961248317160167)
+estimated_transform.scale_translation_from_x(baseline=base_line)
 
-verbose = False 
+transformBounds= TransformBounds(baseline=base_line, dt_max_y=dt_max_y,dt_max_z=dt_max_z, angle_max=angle_max)
+top_limit=int(image_height*0.45)
+bottom_limit=int(image_height*0.8)
+top_limit=0
+bottom_limit=image_height
+
+verbose = True 
 
 computed=[]
 
 for frame in frames:
     frameId=frame["frame_id"]
+    
     invert_left_right = frame["keypoints_camL"][0][0]<frame["keypoints_camR"][0][0]
-    if invert_left_right:
-        imgLeft_path = frame["imgRight"]
-        imgRight_path = frame["imgLeft"]
-    else:
-        imgLeft_path = frame["imgLeft"]
-        imgRight_path = frame["imgRight"]
 
-    base_line=1.125
-    best_results = Transform(base_line,0.,0.,0.,0.,0.)
-    if optimize_global:   
-        left_image = cv2.imread(imgLeft_path)
-        right_image = cv2.imread(imgRight_path)
-        
+    print(frameId,invert_left_right)
 
-        estimated_transform = Transform(base_line,0.,0.,0.,0.,0.)
-        angle_max = np.pi*10./180.
-        dt_max = 0.12001
-        transformBounds= TransformBounds(baseline=1.12, baseline_max_delta=0.01, dt_max=dt_max, angle_max=angle_max)
-        top_limit=int(image_height*0.45)
-        bottom_limit=int(image_height*0.8)
-        #top_limit=int(image_height*0.0)
-        #bottom_limit=int(image_height*1.)
-
-        best_results,ratio = auto_compute_cam2_transform(left_image, right_image,estimatedTransform= estimated_transform, 
-                                                   transformBounds=transformBounds,inlier_threshold=inlier_threshold,
-                                                   topLimit=top_limit,bottomLimit=bottom_limit,verbose=False)
-        tx = best_results.xc
-        best_results.yc*=base_line/tx
-        best_results.zc*=base_line/tx
-        best_results.xc = base_line
-        best_results.yc=round(best_results.yc,3)
-        best_results.zc=round(best_results.zc,3)
-        print(ratio,best_results)
-
+    
     name_left_kps = "keypoints_camR" if invert_left_right else "keypoints_camL"
     name_right_kps = "keypoints_camL" if invert_left_right else "keypoints_camR"
 
-    name_left_img = "imgLeft" if invert_left_right else "imgRight"
-    name_right_img = "imgRight" if invert_left_right else "imgLeft"
+    name_left_img = "imgRight" if invert_left_right else "imgLeft"
+    name_right_img = "imgLeft" if invert_left_right else "imgRight"
+
+    left_image = cv2.imread(frame[name_left_img] )
+    right_image = cv2.imread(frame[name_right_img])
 
     keypoints_cam1_TL=frame[name_left_kps][0]
     keypoints_cam2_TL =frame[name_right_kps][0]
     keypoints_cam1_BL=frame[name_left_kps][3]
     keypoints_cam2_BL =frame[name_right_kps][3]
+
+    if optimize_global:           
+        best_results,ratio = auto_compute_cam2_transform(left_image, right_image,estimatedTransform= estimated_transform, 
+                                                   transformBounds=transformBounds,inlier_threshold=inlier_threshold,verbose=True)
+        best_results.scale_translation_from_x(baseline=base_line)
+        print("refined best")
+        print(ratio,best_results)
 
     nb_kps = len(frame[name_left_kps])
     if nb_kps>4:
@@ -209,17 +202,10 @@ for frame in frames:
     #print(optimized_params_local)
     #R= optimized_params_local[:3]
     #t = optimized_params_local[3:6]
-    imgLeft = cv2.imread(frame[name_left_img])
-    imgRight = cv2.imread(frame[name_right_img])
-
-    base_line=1.12
-
-    estimated_transform = best_results
-
 
     topLeft1,topLeft2,residual_in_m1 = get_3d_point_cam1_2_from_coordinates(
         tuple(keypoints_cam1_TL), 
-        tuple(keypoints_cam2_TL), image_width, image_height, estimated_transform.rotationMatrix,estimated_transform.translationVector, verbose)
+        tuple(keypoints_cam2_TL), image_width, image_height, best_results.rotationMatrix,best_results.translationVector, verbose)
 
     if verbose:
         print(f"3D Point Camera 1: {topLeft1}")
@@ -229,12 +215,12 @@ for frame in frames:
 
     bottomLeft1,bottomLeft2,residual_in_m2 = get_3d_point_cam1_2_from_coordinates(
         tuple(keypoints_cam1_BL), 
-        tuple(keypoints_cam2_BL), image_width, image_height, estimated_transform.rotationMatrix,estimated_transform.translationVector, verbose)
+        tuple(keypoints_cam2_BL), image_width, image_height, best_results.rotationMatrix,best_results.translationVector, verbose)
 
     if verbose:
         print(f"3D Point Camera 1: {bottomLeft1}")
         print(f"3D Point Camera 2: {bottomLeft2}")
-        print(f"Residual: {residual_in_m1}")
+        print(f"Residual: {residual_in_m2}")
 
 
     width1 = np.linalg.norm(np.array(bottomLeft1) - np.array(topLeft1))

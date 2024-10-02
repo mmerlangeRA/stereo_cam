@@ -8,118 +8,149 @@ def rotation_matrix_from_params(params: List[float]) -> np.ndarray:
     return R.from_euler('xyz', params, degrees=False).as_matrix()
     return R.from_euler('yxz',params, degrees=False).as_matrix()
 
-def triangulate_point_old(ray1: np.ndarray, ray2: np.ndarray, t: np.ndarray, R_matrix: np.ndarray, verbose: bool=False) -> Tuple[np.ndarray, np.ndarray, float]:
-    """Triangulate a 3D point from two rays and the relative camera transformation."""
-    # Create the matrix A for the linear system
-    A = np.zeros((3, 3))
-    A[:, 0] = ray1
-    A[:, 1] = -R_matrix @ ray2
-    A[:, 2] = np.cross(ray1, R_matrix @ ray2)
-    b = t
-
-    # Solve the system using least squares
-    lambdas, residuals, _, _ = np.linalg.lstsq(A, b, rcond=None)
-    lambda1, lambda2, _ = lambdas
-
-    # Calculate the 3D point using lambda1
-    point_3d_1 = lambda1 * ray1
-    point_3d_2 = R_matrix @ (lambda2 * ray2) + t
-    #point_3d_2 = lambda2 * ray2
-
-    residual_distance_in_m = np.linalg.norm(point_3d_1 - point_3d_2)
-    #max_acceptable_distance=20.
-
-    #min_d = min(np.linalg.norm(point_3d_1), np.linalg.norm(point_3d_2))
-    #residual_distance_normalized /= min_d
-    '''
-    if min_d>max_acceptable_distance:
-        r= max_acceptable_distance/min_d
-        ratio = r*min_d+(1.-r)*max_acceptable_distance
-        residual_distance_normalized/=ratio
-    else:
-        residual_distance_normalized/=min_d
-    '''
-    #residual_distance_normalized/=min_d
-
-    #if min_d>max_acceptable_distance:
-    #    residual_distance_normalized*=10.*min_d/max_acceptable_distance
-
-    if verbose:
-        print("ray1", ray1)
-        print("ray2", ray2)
-        print(A)
-        print(f"Lambda1: {lambda1}, Lambda2: {lambda2}")
-        print("b", b)
-        predicted_b = A @ lambdas
-        print("predicted_b", predicted_b)
-
-    return point_3d_1, lambda2*ray2, residual_distance_in_m
-
-
-def triangulate_point_from_rays(
-    ray1: Union[np.ndarray, np.array], 
-    ray2: Union[np.ndarray, np.array], 
-    t: np.ndarray, 
-    R_matrix: np.ndarray, 
-    verbose: bool=False
-) -> Union[Tuple[np.ndarray, np.ndarray, float], Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+def compute_single_closest_point(v1:np.array, v2:np.array, t:np.array)-> Tuple[np.array, np.array, float]:
     """
-    Triangulate a 3D point (or points) from two rays and the relative camera transformation.
-    
-    This function handles both single rays and arrays of rays.
+    Computes the closest points between two lines defined by single vectors.
 
     Parameters:
-    - ray1: A 3D vector or an array of 3D vectors representing the first ray(s) from camera 1.
-    - ray2: A 3D vector or an array of 3D vectors representing the second ray(s) from camera 2.
-    - t: A translation vector (between cameras).
-    - R_matrix: Rotation matrix (relative orientation between cameras).
-    - verbose: If True, prints debugging information.
+    - v1: Direction vector of Line 1 (shape: (3,)).
+    - v2: Direction vector of Line 2 (shape: (3,)).
+    - t: Point through which Line 2 passes (shape: (3,)).
 
     Returns:
-    - point_3d_1: The triangulated 3D point(s) from camera 1's perspective.
-    - point_3d_2: The triangulated 3D point(s) from camera 2's perspective.
-    - residual_distance_in_m: The distance between triangulated points from both cameras (if single point).
+    - P1: Point on Line 1 closest to Line 2 (shape: (3,)).
+    - P2: Point on Line 2 closest to Line 1 (shape: (3,)).
+    - distance: Minimal distance between the lines (scalar).
     """
-    def solve_system(ray1, ray2, t, R_matrix):
-        """Solve for a single point."""
-        # Create the matrix A for the linear system
-        A = np.zeros((3, 3))
-        A[:, 0] = ray1
-        A[:, 1] = -R_matrix @ ray2
-        A[:, 2] = np.cross(ray1, R_matrix @ ray2)
-        b = t
+    # Compute dot products
+    A = np.dot(v1, v1)
+    B = np.dot(v1, v2)
+    D = np.dot(v2, v2)
+    C = np.dot(v1, t)
+    E = np.dot(v2, t)
 
-        # Solve the system using least squares
-        lambdas, residuals, _, _ = np.linalg.lstsq(A, b, rcond=None)
-        lambda1, lambda2, _ = lambdas
+    # Set up the system of equations
+    coeff_matrix = np.array([[A, -B],
+                             [B, -D]])
+    rhs = np.array([C, E])
 
-        # Calculate the 3D point using lambda1 and lambda2
-        point_3d_1 = lambda1 * ray1
-        point_3d_2 = R_matrix @ (lambda2 * ray2) + t
-        residual_distance_in_m = np.linalg.norm(point_3d_1 - point_3d_2)
+    # Solve for lambda1 and lambda2
+    try:
+        lambdas = np.linalg.solve(coeff_matrix, rhs)
+        lambda1, lambda2 = lambdas
+    except np.linalg.LinAlgError as e:
+        raise ValueError("Lines are parallel or coincident, no unique minimal distance.") from e
 
-        return point_3d_1, point_3d_2, residual_distance_in_m
+    # Compute the closest points
+    P1 = lambda1 * v1
+    P2 = t + lambda2 * v2
 
-    # Handle scalar inputs
-    if ray1.ndim == 1 and ray2.ndim == 1:
-        return solve_system(ray1, ray2, t, R_matrix)
+    # Compute the minimal distance
+    distance = np.linalg.norm(P1 - P2)
 
-    # Handle array inputs
-    elif ray1.ndim == 2 and ray2.ndim == 2:
-        points_3d_1 = []
-        points_3d_2 = []
-        residuals = []
-        
-        for r1, r2 in zip(ray1, ray2):
-            p1, p2, residual = solve_system(r1, r2, t, R_matrix)
-            points_3d_1.append(p1)
-            points_3d_2.append(p2)
-            residuals.append(residual)
+    return P1, P2, distance
 
-        return np.array(points_3d_1), np.array(points_3d_2), np.array(residuals)
+def compute_closest_points_array(v1_array:np.ndarray, v2_array:np.ndarray, t:np.array)-> Tuple[np.ndarray, np.ndarray, np.array]:
+    """
+    Computes the closest points between pairs of lines defined by arrays of vectors.
 
+    Parameters:
+    - v1_array: Array of direction vectors for Line 1 (shape: (N, 3)).
+    - v2_array: Array of direction vectors for Line 2 (shape: (N, 3)).
+    - t_array: Array of points through which Line 2 passes (shape: (N, 3)).
+
+    Returns:
+    - P1_array: Points on Line 1 closest to Line 2 (shape: (N, 3)).
+    - P2_array: Points on Line 2 closest to Line 1 (shape: (N, 3)).
+    - distances: Minimal distances between the lines (shape: (N,)).
+    """
+    N = v1_array.shape[0]
+
+    # Compute dot products
+    A = np.einsum('ij,ij->i', v1_array, v1_array)  # (N,)
+    B = np.einsum('ij,ij->i', v1_array, v2_array)  # (N,)
+    D = np.einsum('ij,ij->i', v2_array, v2_array)  # (N,)
+    C = np.einsum('ij,ij->i', v1_array, t)   # (N,)
+    E = np.einsum('ij,ij->i', v2_array, t)   # (N,)
+
+    # Set up the system of equations for each pair
+    coeff_matrices = np.stack([
+        np.array([[A[i], -B[i]],
+                  [B[i], -D[i]]]) for i in range(N)
+    ])  # Shape: (N, 2, 2)
+
+    rhs = np.stack([C, E], axis=-1)  # Shape: (N, 2)
+
+    # Solve for lambda1 and lambda2 for each pair
+    try:
+        lambdas = np.linalg.solve(coeff_matrices, rhs)  # Shape: (N, 2)
+        lambda1 = lambdas[:, 0]
+        lambda2 = lambdas[:, 1]
+    except np.linalg.LinAlgError as e:
+        raise ValueError("One or more pairs of lines are parallel or coincident, no unique minimal distance.") from e
+
+    # Compute the closest points
+    P1_array = v1_array * lambda1[:, np.newaxis]  # (N, 3)
+    P2_array = t + v2_array * lambda2[:, np.newaxis]  # (N, 3)
+
+    # Compute the minimal distances
+    distances = np.linalg.norm(P1_array - P2_array, axis=1)  # (N,)
+
+    return P1_array, P2_array, distances
+
+def triangulate_point_from_rays(v1:Union[np.ndarray, np.array], v2:Union[np.ndarray, np.array], t:np.array, R_matrix:np.ndarray, verbose= False)-> Union[Tuple[np.ndarray, np.ndarray, float], Tuple[np.ndarray, np.ndarray, np.array]]:
+    """
+    Computes the closest points between two lines in 3D space.
+
+    Line 1: Passes through the origin and has direction vector v1.
+    Line 2: Passes through point t and has direction vector v2 (after rotation by R_matrix).
+
+    Parameters:
+    - v1: Direction vector(s) of Line 1 (shape: (3,) or (N, 3)).
+    - v2: Direction vector(s) of Line 2 before rotation (shape: (3,) or (N, 3)).
+    - t: Point(s) through which Line 2 passes (shape: (3,) or (N, 3)).
+    - R_matrix: Rotation matrix to be applied to v2 (shape: (3, 3)).
+
+    Returns:
+    - P1: Point(s) on Line 1 closest to Line 2 (shape: (3,) or (N, 3)).
+    - P2: Point(s) on Line 2 closest to Line 1 (shape: (3,) or (N, 3)).
+    - distances: Minimal distance(s) between the lines (scalar or array of shape (N,)).
+    """
+
+    # Ensure inputs are numpy arrays
+    v1 = np.asarray(v1)
+    v2 = np.asarray(v2)
+    t = np.asarray(t)
+    R_matrix = np.asarray(R_matrix)
+
+    # Rotate v2 by R_matrix
+    if v2.ndim == 1:
+        # Single vector
+        v2_rotated = R_matrix @ v2
+    elif v2.ndim == 2:
+        # Array of vectors
+        v2_rotated = (R_matrix @ v2.T).T
     else:
-        raise ValueError("ray1 and ray2 must either both be 1D arrays (for a single point) or both be 2D arrays (for multiple points).")
+        raise ValueError("v2 must be a vector or an array of vectors")
+
+    # Handle different input dimensions
+    if v1.ndim == 1:
+        # v1 is a single vector
+        if v2_rotated.ndim == 1:
+            return compute_single_closest_point(v1, v2_rotated, t)
+        else:
+            raise ValueError("v2_rotated must be same size as v1")
+    elif v1.ndim == 2:
+        # v1 is an array of vectors
+        if v2_rotated.ndim == 2:
+            t_array = np.tile(t, (v1.shape[0], 1))
+            return compute_closest_points_array(v1, v2_rotated, t_array)
+        else:
+            raise ValueError("t must be a single point or an array of points matching v1 and v2")
+    else:
+        raise ValueError("v1 must be a vector or an array of vectors")
+
+
 
 def get_3d_point_cam1_2_from_coordinates_old(keypoints_cam1: Tuple[float, float], keypoints_cam2: Tuple[float, float], image_width: int, image_height: int, R: np.ndarray, t: np.ndarray, verbose: bool=False) -> Tuple[np.ndarray, np.ndarray, float]:
     """Get 3D points from camera coordinates."""
