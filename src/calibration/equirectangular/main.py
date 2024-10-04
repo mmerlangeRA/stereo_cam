@@ -6,11 +6,12 @@ from scipy.optimize import minimize
 import cv2
 
 from src.features_2d.utils import AkazeDescriptorManager, OrbDescriptorManager, detectAndComputeKPandDescriptors, detectAndComputeKPandDescriptors_new, getMatches
-from src.triangulate.main import get_3d_point_cam1_2_from_coordinates, rotation_matrix_from_params
+from src.triangulate.main import get_3d_point_cam1_2_from_coordinates
 from src.utils.coordinate_transforms import cartesian_to_equirectangular, pixel_to_spherical, spherical_to_cartesian
 from src.utils.path_utils import get_ouput_path
 from src.utils.TransformClass import TransformBounds, Transform
 from src.road_detection.common import AttentionWindow
+from src.utils.coordinate_transforms import rotation_matrix_from_vector3D
 
 def getRefinedTransformFromKPMatching(
         keypoints_cam1:np.ndarray,keypoints_cam2:np.ndarray,
@@ -29,7 +30,7 @@ def getRefinedTransformFromKPMatching(
         raise Exception("Inconsistent nb of matches")
     
     def optimizeRT(params):
-        R = rotation_matrix_from_params(params[2:])
+        R = rotation_matrix_from_vector3D(params[2:])
         t = np.array([baseline] + list(params[:2]))
         if verbose:
             print("getRefinedTransformFrom3Matching")

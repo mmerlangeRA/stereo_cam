@@ -2,10 +2,11 @@ from typing import List, Tuple
 import numpy as np
 import cv2
 from python_server.utils.path_helper import get_uploaded_photos_path
-from src.triangulate.main import rotation_matrix_from_params,get_3d_point_cam1_2_from_coordinates
+from src.triangulate.main import get_3d_point_cam1_2_from_coordinates
 from pydantic import BaseModel, Field
 from python_server.settings.settings import settings
 from src.calibration.equirectangular.main import auto_compute_cam2_transform
+from src.utils.coordinate_transforms import rotation_matrix_from_vector3D
 
 class TriangulationRequest(BaseModel):
     keypoints_cam1: Tuple[float, float] = Field(..., example=(0, 0))
@@ -49,7 +50,7 @@ def auto_calibrate_equipoloar(request:AutoCalibrationRequest, verbose=False)->Li
     return optimized_params
 
 def triangulate_equipolar_points(request:TriangulationRequest, verbose=False)-> Tuple[List[float], List[float], float]:
-    rot_matrix = rotation_matrix_from_params(request.R)
+    rot_matrix = rotation_matrix_from_vector3D(request.R)
     point1,point2,residual_in_m = get_3d_point_cam1_2_from_coordinates(request.keypoints_cam1, request.keypoints_cam2, request.image_width, request.image_height, rot_matrix, request.t, verbose)
     if type(point1) is np.ndarray:
         point1 = point1.tolist()

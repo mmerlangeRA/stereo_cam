@@ -3,10 +3,6 @@ from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Union
 from src.utils.coordinate_transforms import pixel_to_spherical, spherical_to_cartesian
 
-def rotation_matrix_from_params(params: List[float]) -> np.ndarray:
-    """Construct a rotation matrix from parameters."""
-    return R.from_euler('xyz', params, degrees=False).as_matrix()
-    return R.from_euler('yxz',params, degrees=False).as_matrix()
 
 def compute_single_closest_point(v1:np.array, v2:np.array, t:np.array)-> Tuple[np.array, np.array, float]:
     """

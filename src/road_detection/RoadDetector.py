@@ -12,7 +12,7 @@ from src.depth_estimation.depth_estimator import Calibration, InputPair
 from src.utils.path_utils import get_static_folder_path, get_ouput_path
 from src.utils.curve_fitting import Road_line_params, compute_residuals, find_best_2_best_contours, find_best_2_polynomial_curves, fit_polynomial_ransac
 from src.utils.disparity import compute_3d_position_from_disparity_map
-from src.utils.coordinate_transforms import cartesian_to_equirectangular, eac_to_road_plane, get_transformation_matrix, pixel_to_spherical, spherical_to_cartesian
+from src.utils.coordinate_transforms import cartesian_to_equirectangular, equirect_to_road_plane_points2D, get_transformation_matrix, pixel_to_spherical, spherical_to_cartesian
 from src.road_detection.RoadSegmentator import RoadSegmentator
 from src.road_detection.common import AttentionWindow
 from src.calibration.cube.StereoCalibrator import StereoFullCalibration
@@ -47,7 +47,7 @@ def compute_eac_road_residual(params, imgWidth, imgHeight, contour_x, contour_y)
     a= params[5]
     b=params[6]
     c=params[7]
-    road_points,width, height = eac_to_road_plane(imgWidth, imgHeight, rvec, camHeight, contour_x, contour_y)
+    road_points,width, height = equirect_to_road_plane_points2D(imgWidth, imgHeight, rvec, camHeight, contour_x, contour_y)
     x_points = road_points[:,0]#road width
     average_x = np.mean(x_points)
     z_points = road_points[:,1]
@@ -260,7 +260,7 @@ class EACRoadDetector(RoadDetector):
         
         if self.debug:
             print(f'found {len(contours)}')
-            cv2.imshow('thresh', thresh)
+            #cv2.imshow('thresh', thresh)
             contour_image = img.copy()
             # Draw contours with random colors
             for contour in contours:

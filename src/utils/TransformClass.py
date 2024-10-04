@@ -54,7 +54,11 @@ class Transform:
     
     @property
     def translationVector(self)->np.array:
-        return np.array([self.xc, self.yc, self.zc])  
+        return np.array([self.xc, self.yc, self.zc]) 
+
+    @property
+    def rotationVector(self)->np.array:
+        return np.array([self.pitch, self.yaw, self.roll ]) 
     
 
 @dataclass

@@ -11,7 +11,7 @@ from src.utils.TransformClass import Transform
 from src.utils.path_utils import get_ouput_path
 from src.calibration.cube.cube import load_calibration_params
 from src.calibration.equirectangular.main import compute_stereo_matched_KP
-from src.triangulate.main import rotation_matrix_from_params
+from src.utils.coordinate_transforms import rotation_matrix_from_vector3D
 
 if __name__ == '__main__':
     img_left_path=r'C:\Users\mmerl\projects\stereo_cam\data\Photos\P5\D_P5_CAM_G_2_EAC.png'

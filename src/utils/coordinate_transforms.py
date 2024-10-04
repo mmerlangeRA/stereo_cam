@@ -1,10 +1,12 @@
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 import numpy as np
 import numpy.typing as npt
 import cv2
+from scipy.spatial.transform import Rotation as R
 
-import numpy as np
-from typing import Union, Tuple
+def rotation_matrix_from_vector3D(params: List[float]) -> np.ndarray:
+    """Construct a rotation matrix from parameters."""
+    return R.from_euler('xyz', params, degrees=False).as_matrix()
 
 def pixel_to_spherical(image_width: int, image_height: int, pixel_x: Union[int, np.ndarray], pixel_y: Union[int, np.ndarray]) -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray]]:
     """
@@ -105,13 +107,6 @@ def pixel_to_cartesian(image_width: int, image_height: int, pixel_x: Union[float
     # If inputs were scalars, return a (3,) array, otherwise return (N, 3) array
     return cartesian_coords[0] if is_scalar else cartesian_coords
 
-def cartesian_to_spherical_old(x:float,y:float,z:float) ->  Tuple[float, float,float]:
-    """Convert 3D cartesian coordinates to spherical coordinates ."""
-    r = np.sqrt(x**2 + y**2 + z**2)
-    theta = np.arctan2(x, z) # Azimuth angle
-    phi = np.arcsin(y / r)    # Elevation angle
-    return np.array([r,theta, phi])
-
 def cartesian_to_spherical(x: Union[float, np.ndarray], y: Union[float, np.ndarray], z: Union[float, np.ndarray]) -> Union[Tuple[float, float, float], Tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """
     Convert 3D cartesian coordinates to spherical coordinates.
@@ -143,13 +138,11 @@ def cartesian_to_spherical(x: Union[float, np.ndarray], y: Union[float, np.ndarr
     else:
         return r, theta, phi
 
-
 def spherical_to_equirectangular(theta:float, phi:float, image_width:int, image_height:int) -> Tuple[int, int]:
     """Convert spherical coordinates to equirectangular pixel coordinates."""
     u = (theta + np.pi) / (2 * np.pi) * image_width
     v = (phi + np.pi / 2) / np.pi * image_height
     return int(u), int(v)
-
 
 def spherical_to_equirectangular(
     theta: Union[float, np.ndarray], 
@@ -189,14 +182,13 @@ def spherical_to_equirectangular(
     else:
         return u_int, v_int
 
-
 def cartesian_to_equirectangular(x:Union[float, np.ndarray], y:Union[float, np.ndarray], z:Union[float, np.ndarray], image_width:int, image_height:int,to_int=True) -> Tuple[int, int]:
     """Convert 3D cartesian coordinates to equirectangular pixel coordinates."""
     _,theta, phi = cartesian_to_spherical(x, y, z)
     return spherical_to_equirectangular(theta, phi, image_width, image_height,to_int=to_int)
 
-def get_transformation_matrix(rvec:np.array, tvec:np.array)->np.array:
-    R, _ = cv2.Rodrigues(rvec)
+def get_transformation_matrix(rvec:np.array, tvec:np.ndarray)->np.array:
+    R = rotation_matrix_from_vector3D(rvec)
     transformation_matrix = np.eye(4)
     transformation_matrix[:3, :3] = R
     transformation_matrix[:3, 3] = tvec.flatten()
@@ -222,67 +214,30 @@ def get_extrinsic_matrix_from_rvec_tvec(rvec:np.array, tvec:np.array)->np.array:
     RT = np.hstack((R, tvec))
     return RT
 
-def eac_to_road_plane(imgWidth:int, imgHeight:int,road_rvec:np.array,camHeight:float,contour_x,contour_y):
-        # We assume world is the camera referential and we want projection on road plane
-        # road_vec is transformation of the road in world space
+def equirect_to_road_points3D(imgWidth:int, imgHeight:int,cam_rot_x:float,camHeight:float,contour_x,contour_y):
+    # We assume world is the camera referential and we want projection on road plane
+    # road_vec is transformation of the road in world space
+    road_rvec=[cam_rot_x,0.,0.]
+    rotation_matrix= rotation_matrix_from_vector3D(road_rvec)
+    
+    #let'sintersect rays with plane road.
+    plane_dy = camHeight
 
-        rotation_matrix, _ = cv2.Rodrigues(road_rvec)
-        #inv_transformation_matrix = np.linalg.inv(transformation_matrix)
-        #let's work in plane referential
-        road_points=[]
-        for i in range(len(contour_x)):
-            x = contour_x[i]
-            y= contour_y[i]
-            plane_dy = -camHeight
-            theta, phi = pixel_to_spherical (imgWidth, imgHeight,x, y)
-            world_ray = spherical_to_cartesian(theta, phi)
-            road_plane_ray = rotation_matrix  @ world_ray
-            l = plane_dy/road_plane_ray[1]
-            p = l*road_plane_ray
-            road_points.append([p[0],p[2]])
-        
-        road_points = np.array(road_points)
+    theta, phi = pixel_to_spherical (imgWidth, imgHeight,contour_x, contour_y)
+    world_ray = spherical_to_cartesian(theta, phi)
+    road_plane_ray = (rotation_matrix  @ world_ray.T).T
+    #we get intersection with plane plane_dy
+    ratio = plane_dy/road_plane_ray[:,1]
+    road_points3D = ratio[:, np.newaxis]*road_plane_ray
 
-        # Find the minimum x value
-        min_x = np.min(road_points[:, 0])
-        max_x = np.max(road_points[:, 0])
-        min_z = np.min(road_points[:, 1])
-        max_z = np.max(road_points[:, 1])
+    return road_points3D
 
-        width = int(max_x - min_x+1)
-        height = int(max_z - min_z+1)
-        
-        road_points[:,0] = (road_points[:,0] - min_x)
-        road_points[:,1] = (road_points[:,1] - min_z)
-        return road_points,width, height
-
-if __name__ == "__main__":
-    # Example usage
-    rvec = np.array([[0.1], [0.2], [0.3]], dtype=np.float32)
-    tvec = np.array([[1.0], [2.0], [3.0]], dtype=np.float32)
-
-    rvec_inv, tvec_inv = invert_rvec_tvec(rvec, tvec)
-
-    print("Inverted rvec:\n", rvec_inv)
-    print("Inverted tvec:\n", tvec_inv)
-
-    R, _ = cv2.Rodrigues(rvec)
-    transformation_matrix = np.eye(4)
-    transformation_matrix[:3, :3] = R
-    transformation_matrix[:3, 3] = tvec.flatten()
-
-    R_inv, _ = cv2.Rodrigues(rvec_inv)
-    transformation_matrix_inverse =np.eye(4)
-    transformation_matrix_inverse[:3, :3] = R_inv
-    transformation_matrix_inverse[:3, 3] = tvec_inv.flatten()
-
-    m = transformation_matrix.dot(transformation_matrix_inverse)
-    print(m)
-
-    transformation_matrix = get_transformation_matrix(rvec, tvec)
-    transformation_matrix_inverse = get_transformation_matrix(rvec_inv, tvec_inv)
-    m = transformation_matrix.dot(transformation_matrix_inverse)
-    print(m)
+def equirect_to_road_plane_points2D(imgWidth:int, imgHeight:int,road_rvec:np.array,camHeight:float,contour_x,contour_y):
+    # We assume world is the camera referential and we want projection on road plane
+    # road_vec is transformation of the road in world space
+    road_points3D = equirect_to_road_points3D(imgWidth, imgHeight, road_rvec[0], camHeight, contour_x, contour_y)
+    road_points_2D = road_points3D[:,[0, 2]]
+    return road_points_2D
 
 
 def intersect_ray_plane(plane_coeffs, ray_direction):
@@ -334,3 +289,33 @@ def transform_plane(plane_coeffs, transformation_matrix):
     
     # Return the new plane coefficients (a', b', c', d')
     return (*new_normal_vector, new_d)
+
+if __name__ == "__main__":
+    # Example usage
+    rvec = np.array([[0.1], [0.2], [0.3]], dtype=np.float32)
+    tvec = np.array([[1.0], [2.0], [3.0]], dtype=np.float32)
+
+    rvec_inv, tvec_inv = invert_rvec_tvec(rvec, tvec)
+
+    print("Inverted rvec:\n", rvec_inv)
+    print("Inverted tvec:\n", tvec_inv)
+
+    R, _ = cv2.Rodrigues(rvec)
+    transformation_matrix = np.eye(4)
+    transformation_matrix[:3, :3] = R
+    transformation_matrix[:3, 3] = tvec.flatten()
+
+    R_inv, _ = cv2.Rodrigues(rvec_inv)
+    transformation_matrix_inverse =np.eye(4)
+    transformation_matrix_inverse[:3, :3] = R_inv
+    transformation_matrix_inverse[:3, 3] = tvec_inv.flatten()
+
+    m = transformation_matrix.dot(transformation_matrix_inverse)
+    print(m)
+
+    transformation_matrix = get_transformation_matrix(rvec, tvec)
+    transformation_matrix_inverse = get_transformation_matrix(rvec_inv, tvec_inv)
+    m = transformation_matrix.dot(transformation_matrix_inverse)
+    print(m)
+
+
