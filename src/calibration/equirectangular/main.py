@@ -247,7 +247,7 @@ def auto_compute_cam2_transform(imLeft:cv2.Mat, imRight:cv2.Mat, estimatedTransf
                                                                                   transfromBounds=transformBounds)
         optimized_R = refine_transform.rotationMatrix
         optimized_t = refine_transform.translationVector
-        inliersIndices = computeInliersIndices(optimized_R, optimized_t, matched1, matched2, inlier_threshold, imLeft.shape[1], imLeft.shape[0])
+        inliersIndices,_ = computeInliersIndices(optimized_R, optimized_t, matched1, matched2, inlier_threshold, imLeft.shape[1], imLeft.shape[0])
         nb_inliers = len(inliersIndices)
         if verbose:
             print(f'refined best result with {nb_inliers} inliers vs {best_nb_inliers}')
@@ -270,4 +270,100 @@ def auto_compute_cam2_transform(imLeft:cv2.Mat, imRight:cv2.Mat, estimatedTransf
         print(times)
 
     return best_transform,best_nb_inliers/nb_good_matches
+
+def compute_stereo_matched_KP(imLeft:cv2.Mat, imRight:cv2.Mat, camRightTransform: Transform,inlier_threshold:float,attention_window:AttentionWindow,  mask_left, mask_right, verbose=False)->Tuple[Transform, float]:
+    if verbose:
+        print("auto_compute_cam2_transform")
+        print(f"camRightTransform {camRightTransform}")
+
+    times={
+        "pre":0,
+        "getRefinedTransformFromKPMatching":0,
+        "inliers":0,
+        "post":0
+    }
+
+    detectorManager = OrbDescriptorManager(nfeatures=5000)
+    #detectorManager = AkazeDescriptorManager()
+
+    start = time.time()
+
+    kpts1, desc1 = detectorManager.detectAndComputeKPandDescriptors(imLeft,mask=mask_left)
+    kpts2, desc2 = detectorManager.detectAndComputeKPandDescriptors(imRight,mask=mask_right)
+    
+    #kpts to uv
+    uv1 = np.array([[k.pt[0], k.pt[1]] for k in kpts1])
+    uv2 = np.array([[k.pt[0], k.pt[1]] for k in kpts2])
+
+    good_matches = detectorManager.getMatches(desc1, desc2)
+    print("nb keypoints",len(kpts1))
+    print(f'nb good matches {len(good_matches)} ')
+    #good_matches = good_matches[:100]
+    
+    query_indices = [m.queryIdx for m in good_matches]
+    train_indices = [m.trainIdx for m in good_matches]
+
+    # Use NumPy indexing to extract the corresponding matched points
+    matched1 = np.array(uv1[query_indices])  # Points from camera 1
+    matched2 = np.array(uv2[train_indices])  # Points from camera 2
+
+    if verbose:
+        good_matches_knn = [[m] for m in good_matches]
+        Matched = cv2.drawMatchesKnn(imLeft, 
+                                    kpts1, 
+                                    imRight, 
+                                    kpts2, 
+                                    good_matches_knn, 
+                                    outImg=None, 
+                                    matchColor=(0, 155, 0), 
+                                    singlePointColor=(0, 255, 255), 
+                                    matchesMask=None, 
+                                    flags=0
+                                    ) 
+  
+        # saving the image  
+        cv2.imwrite(get_ouput_path('Match.jpg'), Matched)
+        #cv2.waitKey(0)
+        print(f'nb good matches {len(matched1)} ')
+
+    endProcessing = time.time()
+    times["pre"] = endProcessing-start
+    time_in_getRefined=0
+    time_in_inliers=0
+    time_in_post=0
+    optimized_R = camRightTransform.rotationMatrix
+    optimized_t = camRightTransform.translationVector
+    image_height,image_width=imLeft.shape[:2]
+    P1, P2, residual_distance_in_m = get_3d_point_cam1_2_from_coordinates(
+        matched1, matched2, image_width, image_height, optimized_R, optimized_t, verbose=False)
+    inliersIndices,_ = computeInliersIndices(optimized_R, optimized_t, matched1, matched2, inlier_threshold, imLeft.shape[1], imLeft.shape[0])
+    point_distances_in_m = np.linalg.norm(P1, axis=1)
+    # Use NumPy to create a boolean mask for inliers
+    inliers_mask = residual_distance_in_m < inlier_threshold * point_distances_in_m
+    #debugging purposes. Delete if needed
+    distances = residual_distance_in_m/(inlier_threshold * point_distances_in_m)
+    
+    # Extract inlier indices efficiently
+    inliersIndices = np.where(inliers_mask)[0].tolist()
+    sub_uv1=np.array([matched1[i] for i in inliersIndices])
+    sub_uv2=np.array([matched2[i] for i in inliersIndices])
+    P1=np.array([P1[i] for i in inliersIndices])
+    P2=np.array([P2[i] for i in inliersIndices])
+
+    debug_image = imLeft.copy()
+    for p in sub_uv1:
+        cv2.circle(debug_image, (int(p[0]), int(p[1])), 2, (0,255,0), -1)
+    d_path=get_ouput_path(f"debug_road.png")
+    cv2.imwrite(d_path, debug_image)
+        
+
+    times["getRefinedTransformFromKPMatching"]=time_in_getRefined
+    times["inliers"]=time_in_inliers
+    times["post"]=time_in_post
+    times["total"]=time.time()-start
+
+    if verbose:
+        print(times)
+
+    return sub_uv1,sub_uv2,P1,P2
 

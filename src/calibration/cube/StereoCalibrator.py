@@ -7,7 +7,7 @@ import numpy as np
 from src.features_2d.utils import detectAndComputeKPandDescriptors
 from scipy.optimize import least_squares
 
-from src.calibration.cube import compute_cube_calibration, undistort_and_crop, undistort_image
+from src.calibration.cube.cube import compute_cube_calibration, undistort_and_crop, undistort_image
 from src.calibration.cube.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
 from src.utils.cube_image import get_cube_front_image
 from src.utils.path_utils import get_calibration_folder_path, get_ouput_path

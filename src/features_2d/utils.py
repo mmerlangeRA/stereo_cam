@@ -9,7 +9,7 @@ class DescriptorManager:
     kpts:List[cv2.KeyPoint]=[]
     desc:List[cv2.Mat]=[]
     matches: List[cv2.DMatch]=[]
-    def detectAndComputeKPandDescriptors(self,img: cv2.Mat, attentionWindow:AttentionWindow) -> Tuple[List[cv2.KeyPoint], cv2.Mat]:
+    def detectAndComputeKPandDescriptors(self,img: cv2.Mat, attentionWindow:AttentionWindow=None,mask=None) -> Tuple[List[cv2.KeyPoint], cv2.Mat]:
         """
         Detects keypoints and computes descriptors within a specified y-range.
 
@@ -20,17 +20,22 @@ class DescriptorManager:
         Returns:
             Tuple[List[cv2.KeyPoint], cv2.Mat]: Detected keypoints and descriptors within the specified y-range.
         """
-        mask = None
+        if mask is None:
+            mask = np.zeros(img.shape[:2], dtype=np.uint8) 
+
         if attentionWindow is not None:
             # Create a mask with the same dimensions as the input image
-            mask = np.zeros(img.shape[:2], dtype=np.uint8)  # Shape: (height, width)
+            # Shape: (height, width)
 
             # Set the mask to 255 (white) in the y-range between top_limit and bottom_limit
             top = attentionWindow.top
             bottom = attentionWindow.bottom
             left = attentionWindow.left
             right = attentionWindow.right
-            mask[top:bottom, left:right] = 255
+            if mask is not None:
+                attention_mask = np.zeros(img.shape[:2], dtype=np.uint8) 
+                attention_mask[top:bottom, left:right] = 255
+                mask = cv2.bitwise_and(mask, attention_mask)
 
         # Initialize the AKAZE feature detector
 
@@ -147,10 +152,11 @@ class OrbDescriptorManager(DescriptorManager):
         super().__init__()
         self.feature2D = cv2.ORB_create(nfeatures = nfeatures)
 
-    def detectAndComputeKPandDescriptors(self,img: cv2.Mat, attentionWindow:AttentionWindow) -> Tuple[List[cv2.KeyPoint], cv2.Mat]:
-        nfeatures = int(attentionWindow.area/200)
-        self.feature2D = cv2.ORB_create(nfeatures = nfeatures)
-        return super().detectAndComputeKPandDescriptors(img, attentionWindow)
+    def detectAndComputeKPandDescriptors(self,img: cv2.Mat, attentionWindow:AttentionWindow=None,mask=None) -> Tuple[List[cv2.KeyPoint], cv2.Mat]:
+        if attentionWindow is not None:
+            nfeatures = int(attentionWindow.area/200)
+            self.feature2D = cv2.ORB_create(nfeatures = nfeatures)
+        return super().detectAndComputeKPandDescriptors(img, attentionWindow,mask)
 
     def getMatches(self, desc1: cv2.Mat, desc2: cv2.Mat, nn_match_ratio=0.75) -> List[cv2.DMatch]:
         """

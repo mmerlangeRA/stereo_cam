@@ -3,21 +3,22 @@ import random
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
-from src.depth_estimation.selective_igev import Selective_igev
-from src.depth_estimation.depth_estimator import Calibration, InputPair
-from src.utils.path_utils import get_static_folder_path
 from typing import Tuple, List, Optional
 import numpy.typing as npt
+from scipy.optimize import minimize,least_squares
 
-from src.utils.curve_fitting import find_best_2_polynomial_curves, fit_polynomial_ransac
+from src.depth_estimation.selective_igev import Selective_igev
+from src.depth_estimation.depth_estimator import Calibration, InputPair
+from src.utils.path_utils import get_static_folder_path, get_ouput_path
+from src.utils.curve_fitting import Road_line_params, compute_residuals, find_best_2_best_contours, find_best_2_polynomial_curves, fit_polynomial_ransac
 from src.utils.disparity import compute_3d_position_from_disparity_map
-from src.utils.coordinate_transforms import eac_to_road_plane, get_transformation_matrix, pixel_to_spherical, spherical_to_cartesian
+from src.utils.coordinate_transforms import cartesian_to_equirectangular, eac_to_road_plane, get_transformation_matrix, pixel_to_spherical, spherical_to_cartesian
 from src.road_detection.RoadSegmentator import RoadSegmentator
 from src.road_detection.common import AttentionWindow
-from src.calibration.StereoCalibrator import StereoFullCalibration
-from scipy.optimize import minimize
-
+from src.calibration.cube.StereoCalibrator import StereoFullCalibration
 from src.utils.image_processing import colorize_disparity_map
+from src.utils.TransformClass import Transform
+
 
 
 class RoadDetector:
@@ -127,42 +128,86 @@ class EACRoadDetector(RoadDetector):
         residual_distance_normalized = result.fun / len(contour_x)
         return optimized_rvec,optimized_camHeight,optimized_road_width,residual_distance_normalized
 
-    def compute_road_equation(self,img: npt.NDArray[np.uint8]):
+    def get_road_contours(self,img: npt.NDArray[np.uint8]) :
+        '''
+        Computes road contours
+        Parameters:
+        - img: image to manage.
+
+        Returns:
+        - contours points
+        '''
         windowed = self.window.crop_image(img)
         if self.debug:
             cv2.imwrite(get_static_folder_path("windowed.png"), windowed)
         # Assuming you have a function to perform semantic segmentation
         self.thresh_windowed = self.roadSegmentator.segment_road_image(windowed)
+        cv2.imwrite(get_ouput_path("thresh_windowed.png"), self.thresh_windowed)
         thresh = np.zeros(img.shape[:2], dtype=np.uint8)
         thresh[self.window.top:self.window.bottom, self.window.left:self.window.right] = self.thresh_windowed
 
         contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        return contours
+    
+    def get_left_right_contours(self,img: npt.NDArray[np.uint8]) :
+        '''
+        Computes left and right contours of an image
+        Parameters:
+        - img: image to manage.
+
+        Returns:
+        - contours_left: points of left contour
+        - contours_right: points of right contour
+        '''
+        contours = self.get_road_contours(img=img)
+    
         if len(contours) == 0:
             print("no contour found on road")
         elif self.debug:
             print(f'found {len(contours)} contours')
         contour = max(contours, key=cv2.contourArea)
         contour_points = contour[:, 0, :]
-        contour_x = contour_points[:, 0]
-        contour_y = contour_points[:, 1]
 
-        #x is a polynom of z; x=a*z2 + bz +c
-        #rot vec
-
-        road_params={
-            "width":4.8,
-        }
-
-    def compute_road_width(self,img: npt.NDArray[np.uint8]) :
-        windowed = self.window.crop_image(img)
+        left_poly_model, right_poly_model, inliers_left_mask, inliers_right_mask = find_best_2_best_contours(contour,degree=self.degree)
+        contour_left = contour_points[inliers_left_mask]
+        contour_right= contour_points[inliers_right_mask]
         if self.debug:
-            cv2.imwrite(get_static_folder_path("windowed.png"), windowed)
-        # Assuming you have a function to perform semantic segmentation
-        self.thresh_windowed = self.roadSegmentator.segment_road_image(windowed)
-        thresh = np.zeros(img.shape[:2], dtype=np.uint8)
-        thresh[self.window.top:self.window.bottom, self.window.left:self.window.right] = self.thresh_windowed
+            print(f'found {len(contours)}')
+            contour_image = img.copy()
+            # Draw contours with random colors
+            cv2.drawContours(contour_image, [contour_left], -1, (255,0,0), 3)
+            cv2.drawContours(contour_image, [contour_right], -1, (0,255,0), 3)            
+            cv2.imwrite(get_ouput_path("contours.png"), contour_image)
 
-        contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        return contour_left,contour_right
+
+    def fit_road_curve_to_left_right_contours(self, contour_left,contour_right,initial_guess:Road_line_params,camRight:Transform,image_width:int, image_height:int)->Road_line_params :
+        '''
+        x= az+b
+        y=h
+        '''
+
+        bonds=[[-0.3,0.3],[-3.,0],[-2.2,-1.3]]
+        lower_bounds = np.array([-0.3, -3, -2.2])
+        upper_bounds = np.array([0.3, 0, 2.3])
+        result = least_squares(
+            compute_residuals,
+            initial_guess.as_array(),
+            args=(contour_left, contour_right, camRight,image_width,image_height),
+            method='trf',  # 'trf' supports bounds
+            bounds=(lower_bounds, upper_bounds)
+        )
+        # Extract optimized parameters
+        a_opt, b_opt, h_opt = result.x
+
+
+        print(f"Optimized line parameters: a = {a_opt}, b = {b_opt}, h = {h_opt}")
+
+        return Road_line_params(a_opt,b_opt, h_opt)
+
+    
+    def compute_road_width(self,img: npt.NDArray[np.uint8]) :
+        contours = self.get_road_contours(img=img)
     
         if len(contours) == 0:
             print("no contour found on road")
