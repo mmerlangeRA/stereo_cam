@@ -4,7 +4,7 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
-from src.road_detection.RoadDetector import EquirectRoadDetector, RoadDetector
+from src.road_detection.RoadDetector import EquirectMonoRoadDetector, RoadDetector
 from src.road_detection.RoadSegmentator import PIDNetRoadSegmentator, RoadSegmentator, SegFormerRoadSegmentator
 from src.road_detection.common import AttentionWindow
 import time
@@ -72,7 +72,7 @@ if uploaded_file is not None:
     former_seg = use_seg
     former_use_1024=use_1024
 
-    roadDetector = EquirectRoadDetector(roadSegmentator=roadSegmentator,window=window,camHeight=cam_height_slider, degree=degree_slider, debug=is_debug)
+    roadDetector = EquirectMonoRoadDetector(roadSegmentator=roadSegmentator,window=window,road_down_y=cam_height_slider, degree=degree_slider, debug=is_debug)
     average_width, first_poly_model, second_poly_model, x, y = roadDetector.compute_road_width(img)
     end_time = time.time()
     st.write("Temps calcul (s)",round(end_time-start_time,2))

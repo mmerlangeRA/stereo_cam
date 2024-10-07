@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 from src.road_detection.RoadSegmentator import SegFormerRoadSegmentator
-from src.road_detection.RoadDetector import EquirectRoadDetector
+from src.road_detection.RoadDetector import EquirectMonoRoadDetector
 from src.road_detection.common import AttentionWindow
 from src.utils.curve_fitting import Road_line_params, find_best_2_polynomial_curves, vizualize_road_equirectangular
 from src.utils.TransformClass import Transform
@@ -49,13 +49,13 @@ if __name__ == '__main__':
  
     #processing
     roadSegmentator = SegFormerRoadSegmentator(kernel_width=10, use_1024=True, debug=True)
-    roadDetector = EquirectRoadDetector(roadSegmentator=roadSegmentator,window=window,camHeight=camHeight, degree=degree, debug=False)
+    roadDetector = EquirectMonoRoadDetector(roadSegmentator=roadSegmentator,window=window,road_down_y=camHeight, degree=degree, debug=False)
     
     cv2.imwrite(get_ouput_path( "window_left.png"),window.crop_image(img_left))
     cv2.imwrite(get_ouput_path( "window_right.png"),window.crop_image(img_right))
     
-    left_countours=roadDetector.get_road_contours(img_left)
-    right_countours=roadDetector.get_road_contours(img_right)
+    left_countours=roadDetector._get_road_contours(img_left)
+    right_countours=roadDetector._get_road_contours(img_right)
     left_contour = max(left_countours, key=cv2.contourArea)
     right_contour = max(right_countours, key=cv2.contourArea)
     

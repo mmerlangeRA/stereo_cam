@@ -1,18 +1,12 @@
 # from bootstrap import set_paths
 # set_paths()
-import math
 import cv2
-from matplotlib import pyplot as plt
-import numpy as np
 
 from src.road_detection.RoadSegmentator import PIDNetRoadSegmentator, SegFormerRoadSegmentator
-from src.road_detection.RoadDetector import EquirectRoadDetector
+from src.road_detection.RoadDetector import EquirectMonoRoadDetector
 from src.road_detection.common import AttentionWindow
-from src.utils.curve_fitting import find_best_2_polynomial_curves, fit_polynomial_ransac
-from src.utils.coordinate_transforms import equirect_to_road_plane_points2D
 from src.utils.path_utils import get_ouput_path
-from src.utils.TransformClass import Transform
-from scipy.optimize import least_squares
+import time
 
 img_path=r'C:\Users\mmerl\projects\stereo_cam\data\Photos\P5\D_P5_CAM_G_1_EAC.png'
 img = cv2.imread(img_path, cv2.IMREAD_COLOR)
@@ -37,12 +31,20 @@ window = AttentionWindow(limit_left, limit_right, limit_top, limit_bottom)
 
 cv2.imwrite(get_ouput_path('road_window.png'), window.crop_image(img))
 
-roadSegmentator = SegFormerRoadSegmentator(kernel_width=20, use_1024=True, debug=debug)
-roadDetector = EquirectRoadDetector(roadSegmentator=roadSegmentator,window=window,camHeight=camHeight, degree=degree, road_window_top=road_window_top,debug=debug)
+initialization_time = time.time()
+roadSegmentator = SegFormerRoadSegmentator(kernel_width=20, use_1024=False, debug=debug)
+end_time = time.time()
+print("Time taken for segmentation initialization: ", end_time - initialization_time, "seconds")
 
-road_width = roadDetector.compute_road_width(img)
+start_time = time.time()
+roadDetector = EquirectMonoRoadDetector(roadSegmentator=roadSegmentator,window=window,road_down_y=camHeight, degree=degree, road_contour_top=road_window_top,debug=debug)
+road_width,optimized_transform = roadDetector.compute_road_width(img)
+print("optimized_transform",optimized_transform)    
+end_time = time.time()
+print("Time taken for road detection: ", end_time - start_time, "seconds")
 
 print("road_width", road_width)
 
+# NB on D_P5_CAM_G_1_EAC, 
 # 668-444 =>5.5
-# (738 - 402)/(668-444)*5.5=>8.25
+# (738 - 395)/(668-444)*5.5=>8.25

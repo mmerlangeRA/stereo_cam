@@ -4,6 +4,9 @@ import numpy.typing as npt
 import cv2
 from scipy.spatial.transform import Rotation as R
 
+from src.utils.intersection_utils import compute_intersection_rays_plane, compute_plane_coordinates, get_plane_P0_and_N_from_transform
+from src.utils.TransformClass import Transform
+
 def rotation_matrix_from_vector3D(params: List[float]) -> np.ndarray:
     """Construct a rotation matrix from parameters."""
     return R.from_euler('xyz', params, degrees=False).as_matrix()
@@ -214,31 +217,26 @@ def get_extrinsic_matrix_from_rvec_tvec(rvec:np.array, tvec:np.array)->np.array:
     RT = np.hstack((R, tvec))
     return RT
 
-def equirect_to_road_points3D(imgWidth:int, imgHeight:int,cam_rot_x:float,camHeight:float,contour_x,contour_y):
+
+def equirect_to_road_points3D(imgWidth:int, imgHeight:int,road_plane_transform:Transform,contour_x,contour_y):
     # We assume world is the camera referential and we want projection on road plane
     # road_vec is transformation of the road in world space
-    road_rvec=[cam_rot_x,0.,0.]
-    rotation_matrix= rotation_matrix_from_vector3D(road_rvec)
+    P0,N = get_plane_P0_and_N_from_transform(road_plane_transform)
     
     #let'sintersect rays with plane road.
-    plane_dy = camHeight
 
     theta, phi = pixel_to_spherical (imgWidth, imgHeight,contour_x, contour_y)
     world_ray = spherical_to_cartesian(theta, phi)
-    road_plane_ray = (rotation_matrix  @ world_ray.T).T
-    #we get intersection with plane plane_dy
-    ratio = plane_dy/road_plane_ray[:,1]
-    road_points3D = ratio[:, np.newaxis]*road_plane_ray
+    road_points3D = compute_intersection_rays_plane(world_ray, P0, N)
 
     return road_points3D
 
-def equirect_to_road_plane_points2D(imgWidth:int, imgHeight:int,road_rvec:np.array,camHeight:float,contour_x,contour_y):
+def equirect_to_road_plane_points2D(imgWidth:int, imgHeight:int,plane_transform:Transform,contour_x,contour_y):
     # We assume world is the camera referential and we want projection on road plane
-    # road_vec is transformation of the road in world space
-    road_points3D = equirect_to_road_points3D(imgWidth, imgHeight, road_rvec[0], camHeight, contour_x, contour_y)
+    road_points3D = equirect_to_road_points3D(imgWidth, imgHeight, plane_transform, contour_x, contour_y)
+    road_points_2D=compute_plane_coordinates(road_points3D,plane_transform)
     road_points_2D = road_points3D[:,[0, 2]]
     return road_points_2D
-
 
 def intersect_ray_plane(plane_coeffs, ray_direction):
     # plane equation is ax+by+cz+d=0

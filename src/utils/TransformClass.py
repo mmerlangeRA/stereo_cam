@@ -13,7 +13,10 @@ class Transform:
     yaw:float
     roll:float
 
-    def __init__(self, xc, yc, zc,pitch, yaw, roll):
+    _rotationMatrix:np.array = None
+    _inverseRotationMatrix:np.array = None
+
+    def __init__(self, xc:float, yc:float, zc:float,pitch:float, yaw:float, roll:float):
         self.xc = xc
         self.yc = yc
         self.zc = zc
@@ -48,9 +51,16 @@ class Transform:
         
     @property
     def rotationMatrix(self)->np.array:
-        rotation = R.from_euler('xyz', [self.pitch,self.yaw,self.roll ], degrees=False)
-        rotation_matrix = rotation.as_matrix()
-        return rotation_matrix
+        if self._rotationMatrix is None:
+            self._rotationMatrix =  R.from_euler('xyz', [self.pitch,self.yaw,self.roll ], degrees=False)
+            self._rotationMatrix = self._rotationMatrix.as_matrix()
+        return self._rotationMatrix
+    
+    @property
+    def inverseRotationMatrix(self)->np.array:
+        if self._inverseRotationMatrix is None:
+            self._inverseRotationMatrix = self.rotationMatrix.T
+        return self._inverseRotationMatrix
     
     @property
     def translationVector(self)->np.array:
