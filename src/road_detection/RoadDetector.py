@@ -1,7 +1,7 @@
 from abc import abstractmethod
+import math
 import random
 import cv2
-from matplotlib import pyplot as plt
 import numpy as np
 from typing import Tuple, List, Optional
 import numpy.typing as npt
@@ -9,7 +9,7 @@ from scipy.optimize import minimize,least_squares
 
 from src.depth_estimation.selective_igev import Selective_igev
 from src.depth_estimation.depth_estimator import Calibration, InputPair
-from src.utils.path_utils import get_static_folder_path, get_ouput_path
+from src.utils.path_utils import get_ouput_path
 from src.utils.curve_fitting import Road_line_params, compute_residuals, find_best_2_best_contours, find_best_2_polynomial_curves, fit_polynomial_ransac
 from src.utils.disparity import compute_3d_position_from_disparity_map
 from src.utils.coordinate_transforms import cartesian_to_equirectangular, equirect_to_road_plane_points2D, get_transformation_matrix, pixel_to_spherical, spherical_to_cartesian
@@ -72,62 +72,23 @@ def compute_eac_road_residual(params, imgWidth, imgHeight, contour_x, contour_y)
     print(global_diff)
     return global_diff
        
-class EACRoadDetector(RoadDetector):
+class EquirectRoadDetector(RoadDetector):
     """
-    Estimates road width from EAC image.
+    Estimates road width from equirectangular image.
     We assume road is a plane and that the camera view direction is // to it
     - window : attention window. Road segmentation and contours will be searched only within this window
     - camHeight : estimated camera's height to the road plane
     - degree : degree of the polynom for curve fitting
     """
     img: npt.NDArray[np.uint8]
-    camHeight=2.
+    camHeight=1.65
+    road_window_top= 0.53
 
-    def __init__(self, roadSegmentator: RoadSegmentator, window:AttentionWindow, camHeight=2.,degree=1,debug=False):
+    def __init__(self, roadSegmentator: RoadSegmentator, window:AttentionWindow, camHeight=2.,degree=1,road_window_top=0.53,debug=False):
         super().__init__(roadSegmentator, window=window,degree=degree,debug=debug)
         self.camHeight = camHeight
+        self.road_window_top=road_window_top
         
-    def compute_line_width(self,imgWidth:int, imgHeight:int, x1:int, x2:int, y1:int, y2:int):
-        plane_dy = self.camHeight
-        theta1, phi1 = pixel_to_spherical (imgWidth, imgHeight,x1, y1)
-        ray1 = spherical_to_cartesian(theta1, phi1)
-
-        theta2, phi2 = pixel_to_spherical (imgWidth, imgHeight, x2, y2)
-        ray2 = spherical_to_cartesian(theta2, phi2)
-
-        lambda1 = plane_dy/ray1[1]
-        lambda2 = plane_dy/ray2[1]
-
-        p1 = lambda1*ray1
-        p2 = lambda2*ray2
-
-        distance = np.linalg.norm(np.array(p1) - np.array(p2))
-        return distance, p1, p2
-   
-    def optimizeRoadDesign(self,imgWidth:int, imgHeight:int, initial_rvec:np.array,initial_camHeight:float,initial_road_width:float,contour_x,contour_y):
-
-        initial_a=0.1
-        initial_b=0.1
-        initial_c=0.1
-        initial_params = np.concatenate([initial_rvec.flatten(), [initial_camHeight, initial_road_width,initial_a,initial_b,initial_c]])
-
-        bounds = [(-np.pi, np.pi), (-np.pi, np.pi), (-np.pi, np.pi), (1.5, 2.5), (2.0, 20.0),(-100.0,100.),(-100.0,100.),(-100.0,100.)]
-
-        result = minimize(
-            compute_eac_road_residual,
-            initial_params,
-            args=(imgWidth, imgHeight, contour_x, contour_y),
-            bounds=bounds,
-            method='L-BFGS-B'  # L-BFGS-B is a good choice when you have bounds
-        )
-        print(result)
-        # Optimized parameters
-        optimized_rvec = result.x[:3]
-        optimized_camHeight = result.x[3]
-        optimized_road_width = result.x[4]
-        residual_distance_normalized = result.fun / len(contour_x)
-        return optimized_rvec,optimized_camHeight,optimized_road_width,residual_distance_normalized
-
     def get_road_contours(self,img: npt.NDArray[np.uint8]) :
         '''
         Computes road contours
@@ -139,7 +100,7 @@ class EACRoadDetector(RoadDetector):
         '''
         windowed = self.window.crop_image(img)
         if self.debug:
-            cv2.imwrite(get_static_folder_path("windowed.png"), windowed)
+            cv2.imwrite(get_ouput_path("windowed.png"), windowed)
         # Assuming you have a function to perform semantic segmentation
         self.thresh_windowed = self.roadSegmentator.segment_road_image(windowed)
         cv2.imwrite(get_ouput_path("thresh_windowed.png"), self.thresh_windowed)
@@ -180,100 +141,142 @@ class EACRoadDetector(RoadDetector):
             cv2.imwrite(get_ouput_path("contours.png"), contour_image)
 
         return contour_left,contour_right
+    
+    def display_road_image(self,left_img_contour_left,left_img_contour_right,camHeight:float,optimized_rotation_vector,img_width:int,img_height:int):
+        road_points_left, road_points_right = self.compute_left_right_road_points2D(left_img_contour_left,left_img_contour_right,camHeight,optimized_rotation_vector,img_width,img_height)
+        road_points_2D = np.concatenate((road_points_left, road_points_right), axis=0)
 
-    def fit_road_curve_to_left_right_contours(self, contour_left,contour_right,initial_guess:Road_line_params,camRight:Transform,image_width:int, image_height:int)->Road_line_params :
-        '''
-        x= az+b
-        y=h
-        '''
+        road_points_x = road_points_2D[:,0]
+        road_points_z = road_points_2D[:,1]
 
-        bonds=[[-0.3,0.3],[-3.,0],[-2.2,-1.3]]
-        lower_bounds = np.array([-0.3, -3, -2.2])
-        upper_bounds = np.array([0.3, 0, 2.3])
+        minX= np.min(road_points_x)
+        maxX= np.max(road_points_x)
+        minZ= np.min(road_points_z)
+        maxZ= np.max(road_points_z)
+
+        width = math.ceil(maxX-minX)
+        height = math.ceil(maxZ-minZ)
+
+        road_points_2D[:,0] = road_points_x - minX
+        road_points_2D[:,1] = road_points_z - minZ
+
+        display_coeff=10
+        road_image = np.zeros((height*display_coeff, width*display_coeff, 3), dtype=np.uint8)
+
+        for p in road_points_2D:
+            x = int(p[0]*display_coeff)
+            y = int(p[1]*display_coeff)
+            road_image[y, x] = [255, 0, 0]
+        cv2.imwrite(get_ouput_path('road_image.png'), road_image)
+
+    def compute_left_right_road_points2D(self,img_contour_left,img_contour_right,camHeight,road_rvec,img_width,img_height):
+        left_contour_x = img_contour_left[:, 0]
+        left_contour_y = img_contour_left[:, 1]
+        road_points_left = equirect_to_road_plane_points2D(imgWidth=img_width, imgHeight=img_height, 
+                                            road_rvec=road_rvec,camHeight=camHeight,
+                                            contour_x=left_contour_x, contour_y=left_contour_y)
+        
+
+        right_contour_x = img_contour_right[:, 0]
+        right_contour_y = img_contour_right[:, 1]
+        road_points_right = equirect_to_road_plane_points2D(imgWidth=img_width, imgHeight=img_height,
+                                            road_rvec=road_rvec,camHeight=camHeight,
+                                            contour_x=right_contour_x, contour_y=right_contour_y)
+        
+        road_points_left= road_points_left[road_points_left[:, 1].argsort()]
+        road_points_right= road_points_right[road_points_right[:, 1].argsort()]
+
+        return road_points_left, road_points_right
+
+    def compute_slopes_difference(self,cam_rotation_vector, left_img_contour_left, left_img_contour_right, camHeight, img_width, img_height):
+        road_points_left, road_points_right = self.compute_left_right_road_points2D(left_img_contour_left,left_img_contour_right,camHeight,cam_rotation_vector,img_width, img_height)
+        nb_left = road_points_left.shape[0]
+        nb_right = road_points_right.shape[0]
+
+        xLeftpoints = road_points_left[:, 0]
+        yLeftpoints = road_points_left[:, 1]
+        xRightpoints = road_points_right[:, 0]
+        yRightpoints = road_points_right[:, 1]
+
+        xleft_1 = xLeftpoints[0]
+        yleft_1 = yLeftpoints[0]
+        xleft_2 = xLeftpoints[nb_left-1]
+        yleft_2 = yLeftpoints[nb_left-1]
+
+        xright_1 = xRightpoints[0]
+        yright_1 = yRightpoints[0]
+        xright_2 = xRightpoints[nb_right-1]
+        yright_2 = yRightpoints[nb_right-1]
+
+        slopes_left = (xleft_2 - xleft_1)/(yleft_2 - yleft_1) 
+        slopes_right = (xright_2 - xright_1)/(yright_2 - yright_1) 
+        
+        slopes_diff = np.abs(slopes_left - slopes_right)
+        #print(slopes_left, slopes_right,slopes_diff)
+
+        return slopes_diff
+
+    # Function to optimize cam_rotation_vector
+    def optimize_cam_rotation(self,left_img_contour_left, left_img_contour_right, camHeight:float, initial_cam_rotation_vector,bounds,img_width:int,img_height:int):
+        # Optimize the cam_rotation_vector using least_squares
         result = least_squares(
-            compute_residuals,
-            initial_guess.as_array(),
-            args=(contour_left, contour_right, camRight,image_width,image_height),
-            method='trf',  # 'trf' supports bounds
-            bounds=(lower_bounds, upper_bounds)
+            fun=lambda cam_rotation_vector: self.compute_slopes_difference(cam_rotation_vector, left_img_contour_left, left_img_contour_right, camHeight,img_width,img_height),
+            x0=initial_cam_rotation_vector,
+            bounds=bounds,  # Add bounds here
+            method='trf'  # 'trf' is the method that supports bounds
         )
-        # Extract optimized parameters
-        a_opt, b_opt, h_opt = result.x
+        # Return the optimized cam_rotation_vector
+        return result.x
 
 
-        print(f"Optimized line parameters: a = {a_opt}, b = {b_opt}, h = {h_opt}")
+        img_height, img_width = img.shape[:2]
 
-        return Road_line_params(a_opt,b_opt, h_opt)
-
-    
     def compute_road_width(self,img: npt.NDArray[np.uint8]) :
-        contours = self.get_road_contours(img=img)
-    
-        if len(contours) == 0:
-            print("no contour found on road")
-        elif self.debug:
-            print(f'found {len(contours)} contours')
-        contour = max(contours, key=cv2.contourArea)
-        contour_points = contour[:, 0, :]
-        contour_x = contour_points[:, 0]
-        contour_y = contour_points[:, 1]
+        left_img_contour_left,left_img_contour_right = self.get_left_right_contours(img)
+        img_height, img_width = img.shape[:2]
 
-        first_poly_model, second_poly_model, y_inliers_first, y_inliers_second = find_best_2_polynomial_curves(contour,degree=self.degree)
-        min_y_inliers_first = np.min(y_inliers_first)
-        min_y_inliers_second = np.min(y_inliers_second)
-        max_y_inliers_first = np.max(y_inliers_first)
-        max_y_inliers_second = np.max(y_inliers_second)
+        #filter to select only closest points to the car
+        road_top = int(self.road_window_top * img_height)
+        left_img_contour_left = left_img_contour_left[left_img_contour_left[:, 1] > road_top]
+        left_img_contour_right = left_img_contour_right[left_img_contour_right[:, 1] > road_top]
 
-        minY = max(min_y_inliers_first, min_y_inliers_second)
-        maxY = min(max_y_inliers_first, max_y_inliers_second)
+        left_img_contour_left= left_img_contour_left[left_img_contour_left[:, 1].argsort()]
+        left_img_contour_right= left_img_contour_right[left_img_contour_right[:, 1].argsort()]
 
-        if maxY < minY:
-            print("no road")
+        # project on road plane and optimize cam rotation
+        cam0Transform = Transform(0.,0,0,0.,0.,0.)
 
-        distances = []
-        points = []
-        imgHeight,imgWidth = img.shape[:2]
-        
-        use_optimal_distance = False
-        for y1 in range(minY, maxY):
-            x1 = first_poly_model.predict([[y1]])[0]
-            if use_optimal_distance:
-                min_distance = float('inf')
-                x2=y2=0
-                for test_y2 in range(minY, maxY):
-                    test_x2 = second_poly_model.predict([[test_y2]])[0]
-                    
-                    d = (x1-test_x2)*(x1-test_x2)+(y1-test_y2)*(y1-test_y2)
-                    print(test_x2, test_y2,d)
-                    if d < min_distance:
-                        min_distance = d
-                        x2=test_x2
-                        y2=test_y2
+        initial_cam_rotation_vector= np.array(cam0Transform.rotationVector)
+        lower_bounds = np.array([-np.pi/4,-np.pi/10000, -np.pi/10000])  # Lower bounds for the rotation vector
+        upper_bounds = np.array([np.pi/4,np.pi/10000,  np.pi/10000])  # Upper bounds for the rotation vector
+        bounds = (lower_bounds, upper_bounds)
 
-            else:
-                x2= second_poly_model.predict([[y1]])[0]
-                y2 = y1
-            distance, p1, p2 = self.compute_line_width(imgWidth, imgHeight, x1,x2, y1,y2)
+        # Optimize the camera rotation vector
+        optimized_rotation_vector = self.optimize_cam_rotation(left_img_contour_left, left_img_contour_right, self.camHeight, initial_cam_rotation_vector, bounds, img_width, img_height)
 
-            points.append([p1, p2])
-            distances.append(distance)
-        
+        print("optimized_rotation_vector",optimized_rotation_vector)
+        road_rvec=optimized_rotation_vector
+
         if self.debug:
-            print(f'found {len(contours)}')
-            #cv2.imshow('thresh', thresh)
-            contour_image = img.copy()
-            # Draw contours with random colors
-            for contour in contours:
-                # Generate a random color
-                color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-                cv2.drawContours(contour_image, [contour], -1, color, 3)
-            print(np.mean(distances))
-            print(points)
-            print(distances)
-            
-            cv2.imshow('contours', contour_image)
-            cv2.imwrite(get_static_folder_path("contours.png"), contour_image)
-        return np.mean(distances),first_poly_model, second_poly_model,contour_x,contour_y    
+            #debug and display
+            self.display_road_image(left_img_contour_left,left_img_contour_right,self.camHeight,optimized_rotation_vector,img_width,img_height)
+
+        #now let's estimate distance between left and right road. They should be more or less parallel now
+        road_points_left, road_points_right=self.compute_left_right_road_points2D(left_img_contour_left,left_img_contour_right,self.camHeight,road_rvec, img_width,img_height)
+
+        x_left = np.mean(road_points_left[:,0])
+        slope_left,intercept_left  = np.polyfit(road_points_left[:,0], road_points_left[:,1], 1)
+        slope_right,intercept_right = np.polyfit(road_points_right[:,0], road_points_right[:,1], 1)
+
+        if (slope_left==0):#impossible... slope should be >>1
+            slope_left=0.0001
+        else:
+            y_left = slope_left*x_left+intercept_left
+            x_right = (intercept_right-y_left+x_left/slope_left)/(1/slope_left-slope_right)
+            y_right = slope_right*x_right+intercept_right
+
+        road_width = np.sqrt((x_right-x_left)*(x_right-x_left) + (y_left-y_right)*(y_left-y_right)) 
+        return road_width
 
 class StereoRoadDetector(RoadDetector):
     calibration:StereoFullCalibration
@@ -321,7 +324,7 @@ class StereoRoadDetector(RoadDetector):
         windowed = self.window.crop_image(imgL)
 
         if self.debug:
-            cv2.imwrite(get_static_folder_path("windowed.png"), windowed)
+            cv2.imwrite(get_ouput_path("windowed.png"), windowed)
         self.thresh_windowed = self.roadSegmentator.segment_road_image(windowed)
         thresh = np.zeros(imgL.shape[:2], dtype=np.uint8)
 
@@ -380,16 +383,14 @@ class StereoRoadDetector(RoadDetector):
             
             cv2.imshow('contours', contour_image)
 
-            cv2.imwrite(get_static_folder_path("contours.png"), contour_image)
+            cv2.imwrite(get_ouput_path("contours.png"), contour_image)
             
             colorized_disparity_map = colorize_disparity_map(disparity_map)
             # Display the colorized disparity map
             cv2.imshow('Colorized Disparity Map', colorized_disparity_map)
 
-            cv2.imwrite(get_static_folder_path("colorized_disparity_map.png"), colorized_disparity_map)
+            cv2.imwrite(get_ouput_path("colorized_disparity_map.png"), colorized_disparity_map)
             
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
 
         return np.mean(distances),first_poly_model, second_poly_model,contour_x,contour_y
 

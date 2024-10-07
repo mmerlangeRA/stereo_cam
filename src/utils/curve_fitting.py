@@ -158,11 +158,23 @@ def fit_polynomial_ransac(
         raise ValueError("x and y must have the same non-zero length")
     poly_model = make_pipeline(
         PolynomialFeatures(degree), 
-        RANSACRegressor(residual_threshold=residual_threshold)
+        RANSACRegressor(residual_threshold=residual_threshold,max_trials=200)
     )
+    
     poly_model.fit(x[:, np.newaxis], y)
-    inlier_mask = poly_model.named_steps['ransacregressor'].inlier_mask_
-    return poly_model, inlier_mask
+    ransac_model = poly_model.named_steps['ransacregressor']
+    polynomial_model = ransac_model.estimator_
+    inlier_mask = ransac_model.inlier_mask_
+
+    polynomial_coefficients = polynomial_model.coef_  # These include the coefficients for the transformed polynomial features
+    intercept = polynomial_model.intercept_ 
+    non_zero_coefficients = polynomial_coefficients[1:]
+    final_coefficients = np.concatenate(([intercept], non_zero_coefficients))
+
+    # print(f"Intercept (bias term): {intercept}")
+    # print(f"Coefficient for x0 (linear term): {polynomial_coefficients[1]}")
+    
+    return poly_model, inlier_mask,final_coefficients
 
 def find_best_2_best_contours(
     contour: npt.NDArray[np.int32], 
@@ -188,7 +200,7 @@ def find_best_2_best_contours(
     y = contour_points[:, 1]
 
     # Fit the first polynomial curve using RANSAC
-    first_poly_model, inliers_first = fit_polynomial_ransac(y, x, degree, residual_threshold=max_pixel_distance)
+    first_poly_model, inliers_first,_ = fit_polynomial_ransac(y, x, degree, residual_threshold=max_pixel_distance)
 
     # Identify outliers from the first fit
     outlier_indices = np.where(~inliers_first)[0]
@@ -196,7 +208,7 @@ def find_best_2_best_contours(
     y_outliers = y[outlier_indices]
 
     # Fit the second polynomial curve using RANSAC on the outliers
-    second_poly_model, inliers_second = fit_polynomial_ransac(
+    second_poly_model, inliers_second,_ = fit_polynomial_ransac(
         y_outliers, x_outliers, degree, residual_threshold=max_pixel_distance
     )
 
