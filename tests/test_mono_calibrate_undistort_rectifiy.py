@@ -1,9 +1,12 @@
+from bootstrap import set_paths
+set_paths()
+
 import cv2
 import os
 
 import numpy as np
 
-from src.calibration.StereoCalibrator import StereoCalibrator
+from src.calibration.cube.StereoCalibrator import StereoCalibrator
 from src.utils.path_utils import find_images_paths_in_folder, load_and_preprocess_cube_front_images
 from src.calibration.cube import undistort_and_crop
 from src.utils.cube_image import get_cube_front_image

@@ -9,7 +9,8 @@ from src.calibration.cube.cube import load_calibration_params, save_calibration_
 from src.calibration.equirectangular.main import auto_compute_cam2_transform, getRefinedTransformFromKPMatching
 from src.utils.TransformClass import TransformBounds, Transform
 from src.utils.path_utils import get_data_path, get_ouput_path
-from src.triangulate.main import get_3d_point_cam1_2_from_coordinates, rotation_matrix_from_params
+from src.triangulate.main import get_3d_point_cam1_2_from_coordinates
+from src.utils.coordinate_transforms import rotation_matrix_from_vector3D
 
 
 #Data for estimating
@@ -126,32 +127,16 @@ dt_max = 0.12001
 estimatedTransform = Transform(xc=1.12,yc=0,zc=0,roll=0,yaw=0,pitch=0)
 bnds = TransformBounds(baseline=1.12,baseline_max_delta=0.01,dt_max=dt_max,angle_max=angle_max)
 
-sub_uv1=np.array([[1970.31982422, 1441.84716797],
-       [3095.4050293 , 1259.29626465],
-       [ 700.72283936, 1145.30444336],
-       [3327.61865234, 1429.95935059]])
-sub_uv2=np.array([[1849.45263672, 1457.89013672],
-       [3003.69213867, 1275.42004395],
-       [ 646.45819092, 1139.27490234],
-       [3193.68505859, 1443.37023926]])
 
-P1,P2,residual_distance_in_m = get_3d_point_cam1_2_from_coordinates(sub_uv1, sub_uv2, 5376, 2688, np.eye(3), [1.12,0,0])
-print(P1,P2,residual_distance_in_m)
 
-test_bounds= TransformBounds(baseline=1.12, baseline_max_delta=0.01, dt_max=dt_max, angle_max=angle_max)
-
-refine_transform,total_residual_in_m = getRefinedTransformFromKPMatching(
-            sub_uv1, sub_uv2, 
-            estimatedTransform=estimatedTransform, 
-            image_width=5376, image_height=2688, transfromBounds=test_bounds)
 
 def generate_all_calibrations(initialTransform:Transform,transformBounds:TransformBounds,inlier_threshold,id):
     print("generate_all_calibrations")
 
     array_calibration = {}
     photo_folder_path = get_data_path('Photos')
-    for photo in range(5,6):
-        for angle in range(2, 3):
+    for photo in range(0,6):
+        for angle in range(0, 3):
             img_folder = os.path.join(photo_folder_path, 'P'+str(photo))
             left_image_path = 'D_P'+str(photo)+'_CAM_G_'+str(angle)+'_EAC.png'
             right_image_path = 'D_P'+str(photo)+'_CAM_D_'+str(angle)+'_EAC.png'
@@ -194,7 +179,7 @@ def compute_results(data):
         print(d["id"])
         file_name = id
         optimized_params = load_calibration_params(file_name)
-        optimized_R = rotation_matrix_from_params(optimized_params[3:])
+        optimized_R = rotation_matrix_from_vector3D(optimized_params[3:])
         optimized_t = optimized_params[:3]
         optimized_t*=1.125/optimized_t[0]
         image_width = d["image_width"]

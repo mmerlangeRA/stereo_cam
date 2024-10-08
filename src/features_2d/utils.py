@@ -21,7 +21,7 @@ class DescriptorManager:
             Tuple[List[cv2.KeyPoint], cv2.Mat]: Detected keypoints and descriptors within the specified y-range.
         """
         if mask is None:
-            mask = np.zeros(img.shape[:2], dtype=np.uint8) 
+            mask = np.ones(img.shape[:2], dtype=np.uint8) 
 
         if attentionWindow is not None:
             # Create a mask with the same dimensions as the input image

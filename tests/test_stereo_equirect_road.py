@@ -1,5 +1,5 @@
-# from bootstrap import set_paths
-# set_paths()
+from bootstrap import set_paths
+set_paths()
 import cv2
 import numpy as np
 import time

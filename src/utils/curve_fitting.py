@@ -219,8 +219,8 @@ def find_best_2_best_contours(
     mean_x_1= np.mean(x[inliers_first])
     mean_x_2= np.mean(x[inliers_second_full])
 
-    swicth_order = mean_x_1 > mean_x_2
-    if swicth_order:
+    switch_order = mean_x_1 > mean_x_2
+    if switch_order:
         return second_poly_model, first_poly_model, inliers_second_full, inliers_first
 
     return first_poly_model, second_poly_model, inliers_first, inliers_second_full

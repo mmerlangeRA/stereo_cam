@@ -1,3 +1,6 @@
+from bootstrap import set_paths
+set_paths()
+
 import cv2
 
 from src.utils.path_utils import get_ouput_path

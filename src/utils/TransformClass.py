@@ -16,7 +16,7 @@ class Transform:
     _rotationMatrix:np.array = None
     _inverseRotationMatrix:np.array = None
 
-    def __init__(self, xc:float, yc:float, zc:float,pitch:float, yaw:float, roll:float):
+    def __init__(self, xc:float=0., yc:float=0., zc:float=0.,pitch:float=0., yaw:float=0., roll:float=0.):
         self.xc = xc
         self.yc = yc
         self.zc = zc

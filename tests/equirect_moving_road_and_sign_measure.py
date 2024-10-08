@@ -1,10 +1,19 @@
+import time
+initialization_start_time = time.time()
+
+from bootstrap import set_paths
+set_paths()
+
 import csv
 import cv2
 import numpy as np
-from src.calibration.equirectangular.main import auto_compute_cam2_transform, getRefinedTransformFromKPMatching
-from refine_transform import compute_R_t
+from src.road_detection.RoadSegmentator import SegFormerRoadSegmentator
+from src.road_detection.common import AttentionWindow
+from src.utils.path_utils import get_ouput_path
+from src.calibration.equirectangular.main import auto_compute_cam2_transform
 from src.triangulate.main import get_3d_point_cam1_2_from_coordinates
 from src.utils.TransformClass import Transform, TransformBounds
+from src.road_detection.StereoEquirectStereoDetector import EquirectStereoRoadDetector
 
 
 frames =[
@@ -136,24 +145,45 @@ frames =[
 image_width =5376 
 image_height= 2688 
 
-invert_left_right = True
-
+#calibration parameters
 optimize_global= True
 inlier_threshold = 0.001
 base_line=1.125
 angle_max = np.pi*5./180.
 dt_max_y = 0.05
 dt_max_z= 0.7
-default_transform = Transform(base_line, 0., 0., 0., 0., 0.)
-best_results = Transform(base_line,0.,0.,0.,0.,0.)
-estimated_transform = Transform(xc=1.1100000000010084, yc=-0.015367638222386357, zc=0.026834207520040555, pitch=0.023162473327744338, yaw=0.07609111219036904, roll=0.009961248317160167)
-estimated_transform.scale_translation_from_x(baseline=base_line)
 
+estimated_camRight_transform = Transform(xc=1.1100000000010084, yc=-0.015367638222386357, zc=0.026834207520040555, pitch=0.023162473327744338, yaw=0.07609111219036904, roll=0.009961248317160167)
+estimated_camRight_transform.scale_translation_from_x(baseline=base_line)
 transformBounds= TransformBounds(baseline=base_line, dt_max_y=dt_max_y,dt_max_z=dt_max_z, angle_max=angle_max)
-top_limit=int(image_height*0.45)
-bottom_limit=int(image_height*0.8)
-top_limit=0
-bottom_limit=image_height
+
+#road detection parameters
+window_left=0.4
+window_right = 0.6
+road_window_top = 0.53
+window_top = 0.4
+window_bottom = 0.6
+road_debug = True
+camHeight = 1.65
+degree= 2
+
+# Attention window for segementation and road detection
+limit_left = int(window_left * image_width)
+limit_right = int(window_right * image_width)
+limit_top = int(window_top * image_height)
+limit_bottom = int(window_bottom * image_height)
+window = AttentionWindow(limit_left, limit_right, limit_top, limit_bottom)
+
+
+roadSegmentator = SegFormerRoadSegmentator(kernel_width=20, use_1024=False, debug=road_debug)
+roadDetector = EquirectStereoRoadDetector(roadSegmentator=roadSegmentator,
+                                          window=window,road_down_y=camHeight, 
+                                          degree=degree, road_contour_top=road_window_top,
+                                          estimated_cam2_transform=estimated_camRight_transform,
+                                        debug=road_debug)
+initialization_end_time = time.time()
+
+print("Time taken for initialization: ", initialization_end_time - initialization_start_time, "seconds")
 
 verbose = True 
 
@@ -182,62 +212,65 @@ for frame in frames:
     keypoints_cam2_BL =frame[name_right_kps][3]
 
     if optimize_global:           
-        best_results,ratio = auto_compute_cam2_transform(left_image, right_image,estimatedTransform= estimated_transform, 
+        refined_camRight_transform,ratio = auto_compute_cam2_transform(left_image, right_image,estimatedTransform= estimated_camRight_transform, 
                                                    transformBounds=transformBounds,inlier_threshold=inlier_threshold,verbose=True)
-        best_results.scale_translation_from_x(baseline=base_line)
+        refined_camRight_transform.scale_translation_from_x(baseline=base_line)
         print("refined best")
-        print(ratio,best_results)
+        print(ratio,refined_camRight_transform)
 
     nb_kps = len(frame[name_left_kps])
-    if nb_kps>4:
-        sub_uv1=[]
-        sub_uv2=[]
-        for i in range(nb_kps):
-            sub_uv1.append(frame[name_left_kps][i])
-            sub_uv2.append(frame[name_right_kps][i])
-            refined_transform_local,total_residual_in_m = getRefinedTransformFromKPMatching(sub_uv1, sub_uv2, initial_params, image_width=image_width, image_height=image_height,bnds=bnds)
-        print(refined_transform_local)
-        print(total_residual_in_m)
-
-    #print(optimized_params_local)
-    #R= optimized_params_local[:3]
-    #t = optimized_params_local[3:6]
 
     topLeft1,topLeft2,residual_in_m1 = get_3d_point_cam1_2_from_coordinates(
         tuple(keypoints_cam1_TL), 
-        tuple(keypoints_cam2_TL), image_width, image_height, best_results.rotationMatrix,best_results.translationVector, verbose)
-
-    if verbose:
-        print(f"3D Point Camera 1: {topLeft1}")
-        print(f"3D Point Camera 2: {topLeft2}")
-        print(f"Residual: {residual_in_m1}")
-
+        tuple(keypoints_cam2_TL), image_width, image_height, refined_camRight_transform.rotationMatrix,refined_camRight_transform.translationVector, verbose)
 
     bottomLeft1,bottomLeft2,residual_in_m2 = get_3d_point_cam1_2_from_coordinates(
         tuple(keypoints_cam1_BL), 
-        tuple(keypoints_cam2_BL), image_width, image_height, best_results.rotationMatrix,best_results.translationVector, verbose)
+        tuple(keypoints_cam2_BL), image_width, image_height, refined_camRight_transform.rotationMatrix,refined_camRight_transform.translationVector, verbose)
+
+    sign_width1 = np.linalg.norm(np.array(bottomLeft1) - np.array(topLeft1))
+    sign_width2 = np.linalg.norm(np.array(bottomLeft2) - np.array(topLeft2))
 
     if verbose:
-        print(f"3D Point Camera 1: {bottomLeft1}")
-        print(f"3D Point Camera 2: {bottomLeft2}")
+        print(f"topLeft 3D Point Camera 1: {topLeft1}")
+        print(f"topLeft 3D Point Camera 2: {topLeft2}")
+        print(f"Residual: {residual_in_m1}")
+        print(f"bottomLeft 3D Point Camera 1: {bottomLeft1}")
+        print(f"bottomLeft 3D Point Camera 2: {bottomLeft2}")
         print(f"Residual: {residual_in_m2}")
+        print(f"{frameId} width cam1 {sign_width1}")
+        print(f"width cam2 {sign_width2}")
 
-
-    width1 = np.linalg.norm(np.array(bottomLeft1) - np.array(topLeft1))
-    print(f"{frameId} width cam1 {width1}")
-
-    width2 = np.linalg.norm(np.array(bottomLeft2) - np.array(topLeft2))
-    print(f"width cam2 {width2}")
+    #now road size
+    start_time = time.time()
+    roadDetector.estimated_cam2_transform = refined_camRight_transform
+    concatenated_horizontal_img = np.concatenate((left_image, right_image), axis=1)
+    road_width = roadDetector.compute_road_width(concatenated_horizontal_img)
+    end_time = time.time()
+    if verbose:
+        cv2.imwrite(get_ouput_path(f'{frameId}_road_window_left.png'), window.crop_image(left_image))
+        cv2.imwrite(get_ouput_path(f'{frameId}_road_window_right.png'), window.crop_image(right_image))
+        if road_width <0:
+            print("No road detected")
+        else:
+            print(f'road_width {road_width} in {end_time- start_time}')
+            road_vector = roadDetector.road_vector
+            left_cam_transform = Transform()
+            debug_img =roadDetector._debug_display_projected_road_on_image(left_image,roadDetector.left_img_contour_left, roadDetector.left_img_contour_right,left_cam_transform,road_vector)
+            cv2.imwrite(get_ouput_path(f'{frameId}_road_debug_left.png'), debug_img)
+            debug_img =roadDetector._debug_display_projected_road_on_image(right_image,roadDetector.right_img_contour_left, roadDetector.right_img_contour_right ,refined_camRight_transform,road_vector)
+            cv2.imwrite(get_ouput_path(f'{frameId}_road_debug_right.png'), debug_img)
 
     computed.append({
         "frame_id":frameId,
-        "width1":round(width1,2),
-        "width2":round(width2,2),
+        "sign_width1":round(sign_width1,2),
+        "sign_width2":round(sign_width2,2),
         "dx":round(topLeft1[0],2),
         "dy":round(topLeft1[1],2),
         "dz":round(topLeft1[2],2),
         "residual_in_m1":residual_in_m1,
-        "residual_in_m2":residual_in_m2
+        "residual_in_m2":residual_in_m2,
+        "road_width":road_width
     })
 
 

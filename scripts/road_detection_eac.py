@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 from src.road_detection.RoadSegmentator import PIDNetRoadSegmentator, SegFormerRoadSegmentator
-from src.road_detection.RoadDetector import EACRoadDetector
+from src.road_detection.RoadDetector import EquirectMonoRoadDetector
 from src.road_detection.common import AttentionWindow
 import argparse
 
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     else:
         roadSegmentator = PIDNetRoadSegmentator(kernel_width=10,debug=args.debug)
 
-    roadDetector = EACRoadDetector(roadSegmentator=roadSegmentator,window=window,camHeight=args.camHeight, degree=args.degree, debug=args.debug)
+    roadDetector = EquirectMonoRoadDetector(roadSegmentator=roadSegmentator,window=window,road_down_y=args.camHeight, degree=args.degree, debug=args.debug)
     average_width, first_poly_model, second_poly_model, contour_x, contour_y = roadDetector.compute_road_width(img)
 
   

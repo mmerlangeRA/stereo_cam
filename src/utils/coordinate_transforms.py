@@ -288,6 +288,29 @@ def transform_plane(plane_coeffs, transformation_matrix):
     # Return the new plane coefficients (a', b', c', d')
     return (*new_normal_vector, new_d)
 
+def get_3D_points_to_cam_transform_referential(points3D: np.ndarray, cam_transform: 'Transform') -> np.ndarray:
+    """
+    Transforms 3D points to the camera's referential using the camera's rotation matrix and translation vector.
+    
+    Parameters:
+    - points3D (np.ndarray): 3D points in world coordinates, shape (n_points, 3).
+    - cam_transform (Transform): The camera transformation, containing rotationMatrix and translationVector.
+    
+    Returns:
+    - np.ndarray: 3D points in the camera's referential, shape (n_points, 3).
+    """
+    # Extract the rotation matrix R and translation vector t from the camera transformation matrix
+    R = cam_transform.rotationMatrix  # Shape (3, 3)
+    t = cam_transform.translationVector  # Shape (3,)
+    
+    # Ensure t is reshaped to (3, 1) for broadcasting
+    t = t[:, np.newaxis]  # Shape (3, 1)
+    
+    # Transform the 3D points to the camera referential
+    points3D_cam_referential = np.dot(R.T, (points3D.T - t)).T
+    
+    return points3D_cam_referential
+
 if __name__ == "__main__":
     # Example usage
     rvec = np.array([[0.1], [0.2], [0.3]], dtype=np.float32)

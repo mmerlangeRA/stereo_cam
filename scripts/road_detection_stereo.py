@@ -8,7 +8,7 @@ import cv2
 from src.road_detection.common import AttentionWindow
 from src.road_detection.RoadSegmentator import PIDNetRoadSegmentator, SegFormerRoadSegmentator
 from src.road_detection.RoadDetector import StereoRoadDetector
-from src.calibration.StereoCalibrator import StereoFullCalibration
+from src.calibration.cube.StereoCalibrator import StereoFullCalibration
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Stereo Road Detection Script with Polynomial Curve Fitting')

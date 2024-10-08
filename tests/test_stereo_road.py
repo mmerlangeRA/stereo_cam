@@ -1,12 +1,12 @@
-# from bootstrap import set_paths
-# set_paths()
+from bootstrap import set_paths
+set_paths()
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
 from src.road_detection.RoadSegmentator import PIDNetRoadSegmentator, SegFormerRoadSegmentator
-from src.road_detection.RoadDetector import EACRoadDetector, StereoRoadDetector
+from src.road_detection.RoadDetector import EquirectMonoRoadDetector, StereoRoadDetector
 from src.road_detection.common import AttentionWindow
-from src.calibration.StereoCalibrator import StereoFullCalibration
+from src.calibration.cube.StereoCalibrator import StereoFullCalibration
 from src.utils.image_processing import reshapeToWindow
 
 imgL_path = r'C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\13_rectified_left.png'

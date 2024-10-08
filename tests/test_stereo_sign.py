@@ -1,20 +1,17 @@
-# from bootstrap import set_paths
-# set_paths()
+from bootstrap import set_paths
+set_paths()
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 from src.road_detection.common import AttentionWindow
-from src.calibration.StereoCalibrator import StereoFullCalibration
+from src.calibration.cube.StereoCalibrator import StereoFullCalibration
 from src.utils.image_processing import colorize_disparity_map, detect_sign, reshapeToWindow
 from src.depth_estimation.depth_estimator import InputPair
 from src.depth_estimation.selective_igev import Selective_igev
 from src.utils.disparity import compute_3d_position_from_disparity
 from src.utils.path_utils import get_static_folder_path
 from src.utils.cube_image import get_cube_front_image
-
-
-
 
 
 def compute_sign_size(rectified_imgL,rectified_imgR,calibration:StereoFullCalibration,attentionWindow:AttentionWindow,sign_window:AttentionWindow,nb_sides:int,index:int,debug=True):
@@ -85,7 +82,7 @@ if __name__ == "__main__":
     imgL_path=r"C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\13_rectified_left.png"
     imgR_path=r"C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\13_rectified_right.png"
 
-    calibration_path = r'C:\Users\mmerl\projects\stereo_cam\calibration\calibrator_matrix_test.json'
+    calibration_path = r'C:\Users\mmerl\projects\stereo_cam\calibration\calibrator_matrix_0025.json'
     imgL = cv2.imread(imgL_path)
     imgR = cv2.imread(imgR_path)
 

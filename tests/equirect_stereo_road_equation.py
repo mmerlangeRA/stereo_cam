@@ -1,5 +1,5 @@
-# from bootstrap import set_paths
-# set_paths()
+from bootstrap import set_paths
+set_paths()
 import cv2
 import numpy as np
 
@@ -10,8 +10,6 @@ from src.road_detection.common import AttentionWindow
 from src.utils.curve_fitting import Road_line_params, find_best_2_polynomial_curves, vizualize_road_equirectangular
 from src.utils.TransformClass import Transform
 from src.utils.path_utils import get_ouput_path
-
-
 
 if __name__ == '__main__':
     img_left_path=r'C:\Users\mmerl\projects\stereo_cam\data\Photos\P5\D_P5_CAM_G_2_EAC.png'

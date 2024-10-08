@@ -1,31 +1,39 @@
-# from bootstrap import set_paths
-# set_paths()
+from bootstrap import set_paths
+set_paths()
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 from src.road_detection.common import AttentionWindow
-from src.calibration.StereoCalibrator import StereoFullCalibration
+from src.calibration.cube.StereoCalibrator import StereoFullCalibration
 from src.utils.path_utils import get_static_folder_path
 from src.utils.cube_image import get_cube_front_image
 from test_stereo_sign import compute_sign_size
 
 
-pathL=r'C:\Users\mmerl\projects\stereo_cam\Photos\kitti\kitti_000046_left.png'
-pathR=r'C:\Users\mmerl\projects\stereo_cam\Photos\kitti\kitti_000046_right.png'
+pathL=r"C:\Users\mmerl\projects\stereo_cam\Photos\P5\D_P5_CAM_G_2_CUBE.png"
+pathR=r"C:\Users\mmerl\projects\stereo_cam\Photos\P5\D_P5_CAM_G_2_CUBE.png"
 
 calibration_path = r'C:\Users\mmerl\projects\stereo_cam\calibration\calibrator_matrix_003.json'
 imgL = cv2.imread(pathL)
 imgR = cv2.imread(pathR)
 
 
+
+
 calibration = StereoFullCalibration.from_json (open(calibration_path, 'r').read())
 
+images = [get_cube_front_image(img) for img in [imgL,imgR]]
+
+imgL=images[0]
+
+imgR=images[1]
+cv2.imwrite(get_static_folder_path("imgL.png"), imgL)
 
 window_left=0.0
 window_right=1.0
-window_top=0.
-window_bottom=1.0
+window_top=0.35
+window_bottom=0.6
 
 debug=True
 
@@ -38,7 +46,7 @@ limit_bottom = int(window_bottom * height)
 attentionWindow = AttentionWindow(limit_left, limit_right, limit_top, limit_bottom,False)
 
 sign_array=[
-    [100,147,170,186,210,4],
+    [13,1012,1090,572,652,4],
 ]
 
 index,left, right, top, bottom,nb_sides=sign_array[0]

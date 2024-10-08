@@ -2,7 +2,7 @@ import cv2
 import os
 from bootstrap import set_paths
 set_paths()
-from src.calibration.StereoCalibrator import StereoCalibrator
+from src.calibration.cube.StereoCalibrator import StereoCalibrator
 from src.utils.path_utils import find_images_paths_in_folder, load_and_preprocess_cube_front_images
 
 # Chessboard' size = nb of inner corners

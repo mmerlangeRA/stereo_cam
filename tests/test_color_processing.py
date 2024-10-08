@@ -1,7 +1,14 @@
+from bootstrap import set_paths
+set_paths()
+
 import cv2
 from python_server.utils.path_helper import get_static_path
 from src.road_detection.common import AttentionWindow
 from src.utils.color_processing import colorize_image_to_pure_colors, replace_colors_based_on_main_colors
+
+'''
+Test to assess more precise position of a road sign
+'''
 
 
 if __name__=="__main__":
