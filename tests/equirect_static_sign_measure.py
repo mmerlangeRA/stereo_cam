@@ -9,7 +9,7 @@ import cv2
 from src.calibration.cube.cube import load_calibration_params, save_calibration_params
 from src.calibration.equirectangular.main import auto_compute_cam2_transform, getRefinedTransformFromKPMatching
 from src.utils.TransformClass import TransformBounds, Transform
-from src.utils.path_utils import get_data_path, get_ouput_path
+from src.utils.path_utils import get_data_path, get_output_path
 from src.triangulate.main import get_3d_point_cam1_2_from_coordinates
 from src.road_detection.common import AttentionWindow
 from src.utils.coordinate_transforms import rotation_matrix_from_vector3D
@@ -159,11 +159,11 @@ def generate_all_calibrations(initialTransform:Transform,transformBounds:Transfo
                 print("xc=1.1172368555319054, yc=0.025977033492034635, zc=-0.023022251262983105, pitch=0.021132456611368963, yaw=0.08268023395126954, roll=0.0119667804450229")
                 optimized_params = best_results.as_array()
                 array_calibration[str(photo)+"_"+str(angle)]=optimized_params
-                save_calibration_params(optimized_params, get_ouput_path(str(photo)+"_"+str(angle)+".csv"))
+                save_calibration_params(optimized_params, get_output_path(str(photo)+"_"+str(angle)+".csv"))
 
     csv_data = [{"id": key, "tx": value[0], "ty": value[1], "tz": value[2], "rx": value[3], "ry": value[4], "rz": value[5]} for key, value in array_calibration.items()]
     # Define CSV file name to save  all calibrations
-    csv_file = get_ouput_path(f'calibrations{id}.csv')
+    csv_file = get_output_path(f'calibrations{id}.csv')
     # Write to CSV file
     with open(csv_file, mode='w', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=["id", "tx", "ty", "tz", "rx", "ry", "rz"])
@@ -193,7 +193,7 @@ def compute_results(data):
         if id == "5_20":
             continue
         photo,angle = id.split("_")
-        optimized_params = load_calibration_params(get_ouput_path(file_name))
+        optimized_params = load_calibration_params(get_output_path(file_name))
         optimized_R = rotation_matrix_from_vector3D(optimized_params[3:])
         optimized_t = optimized_params[:3]
         optimized_t*=1.12/optimized_t[0]
@@ -244,7 +244,7 @@ def compute_results(data):
         print("\n")
     
     csv_data = [{"id": key, "taille": value[0], "hauteur": value[1]} for key, value in array_result.items()]
-    csv_file =get_ouput_path('resultats.csv')
+    csv_file =get_output_path('resultats.csv')
     with open(csv_file, mode='w', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=["id", "taille", "hauteur"])
         writer.writeheader()

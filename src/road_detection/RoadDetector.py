@@ -10,8 +10,8 @@ from scipy.optimize import minimize,least_squares
 
 from src.depth_estimation.selective_igev import Selective_igev
 from src.depth_estimation.depth_estimator import Calibration, InputPair
-from src.utils.path_utils import get_ouput_path
-from src.utils.curve_fitting import Road_line_params, compute_residuals, find_best_2_best_contours, find_best_2_polynomial_curves, fit_polynomial_ransac
+from src.utils.path_utils import get_output_path
+from src.utils.curve_fitting import Road_line_params, compute_residuals, find_best_2_best_polynomial_contours, find_best_2_polynomial_curves, fit_polynomial_ransac
 from src.utils.disparity import compute_3d_position_from_disparity_map
 from src.utils.coordinate_transforms import cartesian_to_equirectangular, equirect_to_road_plane_points2D, get_transformation_matrix, pixel_to_spherical, spherical_to_cartesian
 from src.road_detection.RoadSegmentator import RoadSegmentator
@@ -23,27 +23,41 @@ from src.utils.typing import cvImage
 from src.utils.intersection_utils import get_plane_P0_and_N_from_transform
 
 class RoadEquationInPlane:
+    #equation left : x= slope_x_from_z*z + intercept_z
+    #equation right : x= slope_x_from_z*z + intercept_z + delta_x
+    
     slope_x_from_z: float
-    width: float
+    delta_x: float
     intercept_z:float
 
-    def __init__(self, slope_x_from_z: float, width: float, intercept_z:float) -> None:
+    def __init__(self, slope_x_from_z: float, delta_x: float, intercept_z:float) -> None:
         self.slope_x_from_z = slope_x_from_z
-        self.width = width
+        self.delta_x = delta_x
         self.intercept_z = intercept_z
+    
+    def get_road_width(self) -> float:
+        return math.cos(self.slope_x_from_z) * self.delta_x
+    
 
 
 class RoadDetector:
-    roadSegmentator : RoadSegmentator
+    roadSegmentator : RoadSegmentator = None
     window:AttentionWindow
     degree:int
     thresh_windowed: cvImage
+    frame_id: int = 0
+
     def __init__(self,roadSegmentator : RoadSegmentator,window:AttentionWindow, degree=1,debug=False):
         self.roadSegmentator = roadSegmentator
         self.window = window
         self.degree = degree
         self.debug = debug
         
+    def set_frame_id(self, frame_id: int) -> None:
+        self.frame_id = frame_id
+        if self.roadSegmentator is not None:
+            self.roadSegmentator.set_frame_id(frame_id)
+
     @abstractmethod
     def compute_road_width(self,img: cvImage)->float:
         pass
@@ -103,10 +117,10 @@ class EquirectMonoRoadDetector(RoadDetector):
         """
         windowed = self.window.crop_image(img)
         if self.debug:
-            cv2.imwrite(get_ouput_path("windowed.png"), windowed)
+            cv2.imwrite(get_output_path("windowed.png"), windowed)
 
         self.thresh_windowed = self.roadSegmentator.segment_road_image(windowed)
-        cv2.imwrite(get_ouput_path("thresh_windowed.png"), self.thresh_windowed)
+        cv2.imwrite(get_output_path("thresh_windowed.png"), self.thresh_windowed)
 
         thresh = np.zeros(img.shape[:2], dtype=np.uint8)
         thresh[self.window.top:self.window.bottom, self.window.left:self.window.right] = self.thresh_windowed
@@ -114,7 +128,7 @@ class EquirectMonoRoadDetector(RoadDetector):
         contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         return contours
 
-    def _get_left_right_contours(self, img: cvImage) -> Tuple[Sequence[np.ndarray], Sequence[np.ndarray]]:
+    def _get_left_right_contours(self, img: cvImage, prefix="") -> Tuple[Sequence[np.ndarray], Sequence[np.ndarray]]:
         """
         Computes the left and right contours from an image.
 
@@ -132,7 +146,7 @@ class EquirectMonoRoadDetector(RoadDetector):
         contour = max(contours, key=cv2.contourArea)
         contour_points = contour[:, 0, :]
 
-        left_poly_model, right_poly_model, inliers_left_mask, inliers_right_mask = find_best_2_best_contours(contour, degree=self.degree)
+        left_poly_model, right_poly_model, inliers_left_mask, inliers_right_mask = find_best_2_best_polynomial_contours(contour, degree=self.degree)
         contour_left = contour_points[inliers_left_mask]
         contour_right = contour_points[inliers_right_mask]
 
@@ -142,7 +156,7 @@ class EquirectMonoRoadDetector(RoadDetector):
             # Draw contours with random colors
             cv2.drawContours(contour_image, [contour_left], -1, (255, 0, 0), 3)
             cv2.drawContours(contour_image, [contour_right], -1, (0, 255, 0), 3)
-            cv2.imwrite(get_ouput_path("contours.png"), contour_image)
+            cv2.imwrite(get_output_path(f"{prefix}_contours.png"), contour_image)
 
         return contour_left, contour_right
 
@@ -187,7 +201,7 @@ class EquirectMonoRoadDetector(RoadDetector):
             y = int(p[1] * display_coeff)
             road_image[y, x] = [255, 0, 0]
 
-        cv2.imwrite(get_ouput_path('road_image.png'), road_image)
+        cv2.imwrite(get_output_path('road_image.png'), road_image)
 
     def _compute_left_right_road_points2D(self, 
                                           img_contour_left: Sequence[np.ndarray], 
@@ -429,7 +443,7 @@ class StereoRoadDetector(RoadDetector):
         windowed = self.window.crop_image(imgL)
 
         if self.debug:
-            cv2.imwrite(get_ouput_path("windowed.png"), windowed)
+            cv2.imwrite(get_output_path(f"{self.frame_id}_windowed.png"), windowed)
         self.thresh_windowed = self.roadSegmentator.segment_road_image(windowed)
         thresh = np.zeros(imgL.shape[:2], dtype=np.uint8)
 
@@ -488,13 +502,13 @@ class StereoRoadDetector(RoadDetector):
             
             cv2.imshow('contours', contour_image)
 
-            cv2.imwrite(get_ouput_path("contours.png"), contour_image)
+            cv2.imwrite(get_output_path("contours.png"), contour_image)
             
             colorized_disparity_map = colorize_disparity_map(disparity_map)
             # Display the colorized disparity map
             cv2.imshow('Colorized Disparity Map', colorized_disparity_map)
 
-            cv2.imwrite(get_ouput_path("colorized_disparity_map.png"), colorized_disparity_map)
+            cv2.imwrite(get_output_path("colorized_disparity_map.png"), colorized_disparity_map)
             
 
         return np.mean(distances),first_poly_model, second_poly_model,contour_x,contour_y

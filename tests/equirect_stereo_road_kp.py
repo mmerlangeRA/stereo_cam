@@ -8,7 +8,7 @@ from src.road_detection.RoadDetector import EquirectMonoRoadDetector
 from src.road_detection.common import AttentionWindow
 from src.utils.curve_fitting import Road_line_params, find_best_2_polynomial_curves, vizualize_road_equirectangular
 from src.utils.TransformClass import Transform
-from src.utils.path_utils import get_ouput_path
+from src.utils.path_utils import get_output_path
 from src.calibration.cube.cube import load_calibration_params
 from src.calibration.equirectangular.main import compute_stereo_matched_KP
 from src.utils.coordinate_transforms import rotation_matrix_from_vector3D
@@ -51,8 +51,8 @@ if __name__ == '__main__':
     roadSegmentator = SegFormerRoadSegmentator(kernel_width=10, use_1024=True, debug=True)
     roadDetector = EquirectMonoRoadDetector(roadSegmentator=roadSegmentator,window=window,road_down_y=camHeight, degree=degree, debug=False)
     
-    cv2.imwrite(get_ouput_path( "window_left.png"),window.crop_image(img_left))
-    cv2.imwrite(get_ouput_path( "window_right.png"),window.crop_image(img_right))
+    cv2.imwrite(get_output_path( "window_left.png"),window.crop_image(img_left))
+    cv2.imwrite(get_output_path( "window_right.png"),window.crop_image(img_right))
     
     left_countours=roadDetector._get_road_contours(img_left)
     right_countours=roadDetector._get_road_contours(img_right)
@@ -107,13 +107,13 @@ if __name__ == '__main__':
     mask_left = cv2.morphologyEx(mask_left, cv2.MORPH_DILATE, kernel)
     mask_right = cv2.morphologyEx(mask_right, cv2.MORPH_DILATE, kernel)
 
-    cv2.imwrite(get_ouput_path("mask_left.png"), mask_left)
-    cv2.imwrite(get_ouput_path("mask_right.png"), mask_right)
+    cv2.imwrite(get_output_path("mask_left.png"), mask_left)
+    cv2.imwrite(get_output_path("mask_right.png"), mask_right)
 
     
     #left_contour_left, left_contour_right = roadDetector.get_left_right_contours(img_left)
     #right_contour_left, right_contour_right = roadDetector.get_left_right_contours(img_right)
-    optimized_params = load_calibration_params(get_ouput_path("5_2.csv"))
+    optimized_params = load_calibration_params(get_output_path("5_2.csv"))
     optimized_t = optimized_params[:3]
     optimized_t*=1.12/optimized_t[0]
     tx,ty, tz = optimized_t
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     for p in right_contour_left:
         cv2.circle(img_right, p, 2, (255, 0, 0), -1)
     
-    cv2.imwrite(get_ouput_path("superleft.png"),img_left)
+    cv2.imwrite(get_output_path("superleft.png"),img_left)
 
     attention_window = AttentionWindow(limit_left, limit_right, limit_top, limit_bottom)
 

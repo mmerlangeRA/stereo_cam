@@ -9,7 +9,7 @@ import cv2
 from src.calibration.cube.cube import load_calibration_params, save_calibration_params
 from src.calibration.equirectangular.main import auto_compute_cam2_transform, getRefinedTransformFromKPMatching
 from src.utils.TransformClass import TransformBounds, Transform
-from src.utils.path_utils import get_data_path, get_ouput_path
+from src.utils.path_utils import get_data_path, get_output_path
 from src.triangulate.main import get_3d_point_cam1_2_from_coordinates
 from src.utils.coordinate_transforms import rotation_matrix_from_vector3D
 
@@ -197,7 +197,7 @@ def compute_results(data):
         print("\n")
     
     csv_data = [{"id": key, "taille": value[0], "hauteur": value[1]} for key, value in array_result.items()]
-    csv_file =get_ouput_path('resultats.csv')
+    csv_file =get_output_path('resultats.csv')
     with open(csv_file, mode='w', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=["id", "taille", "hauteur"])
         writer.writeheader()

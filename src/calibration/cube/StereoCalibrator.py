@@ -10,7 +10,7 @@ from scipy.optimize import least_squares
 from src.calibration.cube.cube import compute_cube_calibration, undistort_and_crop, undistort_image
 from src.calibration.cube.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
 from src.utils.cube_image import get_cube_front_image
-from src.utils.path_utils import get_calibration_folder_path, get_ouput_path
+from src.utils.path_utils import get_calibration_folder_path, get_output_path
 
 @dataclass
 class StereoFullCalibration:
@@ -256,7 +256,7 @@ class StereoCalibrator:
             if self.verbose:
                 # Draw matches
                 img_matches = cv2.drawMatches(imgLeft, keypoints_list[0], imgRight, keypoints_list[1], matches[:50], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-                save_path= get_ouput_path(f'img_matches_{i}.png')
+                save_path= get_output_path(f'img_matches_{i}.png')
                 cv2.imwrite(save_path, img_matches)
 
             # Extract matched keypoints
@@ -414,8 +414,8 @@ class StereoCalibrator:
 
         dst11 = cv2.warpPerspective(dst1,rectmat1,size)
         dst22 = cv2.warpPerspective(dst2,rectmat2,size)
-        cv2.imwrite(get_ouput_path("gauche.png"), dst11)
-        cv2.imwrite(get_ouput_path("droite.png"), dst22)
+        cv2.imwrite(get_output_path("gauche.png"), dst11)
+        cv2.imwrite(get_output_path("droite.png"), dst22)
 
 
         #calculation of the disparity

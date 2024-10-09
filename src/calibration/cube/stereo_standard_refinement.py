@@ -4,7 +4,7 @@ import numpy as np
 from src.features_2d.utils import detectAndComputeKPandDescriptors
 from scipy.optimize import least_squares
 
-from src.utils.path_utils import get_ouput_path
+from src.utils.path_utils import get_output_path
 
 def compute_reprojection_residual(params:List[float],pts1, pts2, dist_coeffs:List[float])->float:
     """
@@ -83,7 +83,7 @@ def compute_auto_calibration_for_2_stereo_standard_images(imgLeft:cv2.typing.Mat
     if verbose:
     # Draw matches
         img_matches = cv2.drawMatches(images[0], keypoints_list[0], images[1], keypoints_list[1], matches[:50], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        cv2.imwrite(get_ouput_path('img_matches.png'), img_matches)
+        cv2.imwrite(get_output_path('img_matches.png'), img_matches)
     # plt.imshow(img_matches)
     # plt.show()
 

@@ -9,7 +9,7 @@ from src.road_detection.RoadDetector import EquirectMonoRoadDetector
 from src.road_detection.common import AttentionWindow
 from src.utils.curve_fitting import Road_line_params, find_best_2_polynomial_curves, vizualize_road_equirectangular
 from src.utils.TransformClass import Transform
-from src.utils.path_utils import get_ouput_path
+from src.utils.path_utils import get_output_path
 from src.calibration.cube.cube import load_calibration_params
 from src.calibration.equirectangular.main import compute_stereo_matched_KP
 from src.triangulate.main import get_3d_point_cam1_2_from_coordinates
@@ -45,8 +45,8 @@ if __name__ == '__main__':
         roadSegmentator = SegFormerRoadSegmentator(kernel_width=10, use_1024=True, debug=True)
         roadDetector = EquirectMonoRoadDetector(roadSegmentator=roadSegmentator,window=window,road_down_y=camHeight, degree=degree, debug=False)
         
-        cv2.imwrite(get_ouput_path( "window_left.png"),window.crop_image(img_left))
-        cv2.imwrite(get_ouput_path( "window_right.png"),window.crop_image(img_right))
+        cv2.imwrite(get_output_path( "window_left.png"),window.crop_image(img_left))
+        cv2.imwrite(get_output_path( "window_right.png"),window.crop_image(img_right))
         
         left_countours=roadDetector._get_road_contours(img_left)
         right_countours=roadDetector._get_road_contours(img_right)
@@ -94,8 +94,8 @@ if __name__ == '__main__':
         for p in right_contour_left:
             cv2.circle(contour_right_img, p, 2, (255, 0, 0), -1)
         
-        cv2.imwrite(get_ouput_path("contour_left.png"),contour_left_img)
-        cv2.imwrite(get_ouput_path("contour_right.png"),contour_right_img)
+        cv2.imwrite(get_output_path("contour_left.png"),contour_left_img)
+        cv2.imwrite(get_output_path("contour_right.png"),contour_right_img)
 
         img_left_test_x_left = int(left_poly_model_left.predict([[img_left_test_y]])[0])
         img_right_test_x_left = int(right_poly_model_left.predict([[img_right_test_y]])[0])
@@ -121,9 +121,9 @@ if __name__ == '__main__':
         
         if debug and False:
             cv2.imshow("template",template)
-            cv2.imwrite(get_ouput_path( "template.png"), template)
+            cv2.imwrite(get_output_path( "template.png"), template)
             cv2.imshow("rightImageExtract", rightImageExtract)
-            cv2.imwrite(get_ouput_path( "rightImageExtract.png"), rightImageExtract)
+            cv2.imwrite(get_output_path( "rightImageExtract.png"), rightImageExtract)
         
         template_height, template_height = template.shape[:2]
         searched_zone_height, searched_zone_width = rightImageExtract.shape[:2]
@@ -165,7 +165,7 @@ if __name__ == '__main__':
                 cv2.circle(copyLeft, [left_image_x,left_image_y], 20, (255, 0, 0), -1)
                 cv2.circle(copyRight, [right_image_matched_x,right_image_matched_y], 20, (255, 0, 0), -1)
                 both = np.concatenate((copyLeft, copyRight), axis=0)
-                cv2.imwrite(get_ouput_path( f"both{meth}.png"), both)
+                cv2.imwrite(get_output_path( f"both{meth}.png"), both)
 
             P1, P2, residual_distance_in_m = get_3d_point_cam1_2_from_coordinates(
                 tuple([left_image_x,left_image_y]),
@@ -221,7 +221,7 @@ if __name__ == '__main__':
                 return values['img_left_test_x_left'],values['img_right_test_x_left'],values['img_left_test_x_right'],values['img_right_test_x_right']
         return None  # Return None if no match is found
     
-    optimized_params = load_calibration_params(get_ouput_path("5_2.csv"))
+    optimized_params = load_calibration_params(get_output_path("5_2.csv"))
     optimized_t = optimized_params[:3]
     optimized_t*=1.12/optimized_t[0]
     tx,ty, tz = optimized_t

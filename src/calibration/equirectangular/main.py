@@ -8,10 +8,13 @@ import cv2
 from src.features_2d.utils import AkazeDescriptorManager, OrbDescriptorManager, detectAndComputeKPandDescriptors, detectAndComputeKPandDescriptors_new, getMatches
 from src.triangulate.main import get_3d_point_cam1_2_from_coordinates
 from src.utils.coordinate_transforms import cartesian_to_equirectangular, pixel_to_spherical, spherical_to_cartesian
-from src.utils.path_utils import get_ouput_path
+from src.utils.path_utils import get_output_path
 from src.utils.TransformClass import TransformBounds, Transform
 from src.road_detection.common import AttentionWindow
 from src.utils.coordinate_transforms import rotation_matrix_from_vector3D
+from src.logger import get_logger
+
+logger = get_logger(__name__)
 
 def getRefinedTransformFromKPMatching(
         keypoints_cam1:np.ndarray,keypoints_cam2:np.ndarray,
@@ -24,23 +27,23 @@ def getRefinedTransformFromKPMatching(
     bnds= transfromBounds.get_bounds()
 
     if len(keypoints_cam1) ==0:
-        raise Exception("No matches found")
+        raise Exception('No matches found')
     
     if len(keypoints_cam1) != len(keypoints_cam2):
-        raise Exception("Inconsistent nb of matches")
+        raise Exception('Inconsistent nb of matches')
     
     def optimizeRT(params):
         R = rotation_matrix_from_vector3D(params[2:])
         t = np.array([baseline] + list(params[:2]))
         if verbose:
-            print("getRefinedTransformFrom3Matching")
-            print("R",R)
-            print("t", t)
-            print("keypoints_cam1",keypoints_cam1)
+            logger.debug('getRefinedTransformFrom3Matching')
+            logger.debug(f'R {R}')
+            logger.debug(f't  {t}')
+            logger.debug('keypoints_cam1 {keypoints_cam1}')
         total_residual_in_m = 0.
         _,_,residual_distance_in_m = get_3d_point_cam1_2_from_coordinates(keypoints_cam1, keypoints_cam2, image_width, image_height, R, t)
         total_residual_in_m = np.sum(residual_distance_in_m)
-        #print("total_residual", total_residual)
+
         return total_residual_in_m
     
     result = minimize(optimizeRT, initial_params, bounds=bnds)
@@ -61,7 +64,7 @@ def computeInliersIndices(
     image_width: int, 
     image_height: int
 ) -> List[int]:
-    """
+    '''
     Compute inlier indices based on 3D point reconstruction residuals.
 
     Parameters:
@@ -75,7 +78,7 @@ def computeInliersIndices(
 
     Returns:
     - inliers_indices: List of indices of keypoints that are considered inliers.
-    """
+    '''
     
     # Compute 3D points and residuals for all keypoints in one go
     P1, P2, residual_distance_in_m = get_3d_point_cam1_2_from_coordinates(
@@ -106,53 +109,42 @@ def computeInliersIndices(
     
     # Extract inlier indices efficiently
     inliers_indices = np.where(inliers_mask)[0].tolist()
-    
-    # Calculate the mean distance and mean residual for inliers
-    #mean_distance = np.mean(point_distances_in_m[inliers_mask]) if inliers_indices else 0.
-    #mean_residual = np.mean(residual_distance_in_m[inliers_mask]) if inliers_indices else 0.
-    
-    # Print mean values if needed (commented out for now)
-    # print(f"mean_distance: {mean_distance}")
-    # print(f"mean_residual: {mean_residual}")
 
     return inliers_indices, distances
 
 
-def auto_compute_cam2_transform(imLeft:cv2.Mat, imRight:cv2.Mat, estimatedTransform: Transform,transformBounds:TransformBounds,inlier_threshold:float,attention_window:AttentionWindow=None,  verbose=False)->Tuple[Transform, float]:
+def auto_compute_cam2_transform(imLeft:cv2.Mat, imRight:cv2.Mat, estimatedTransform: Transform,transformBounds:TransformBounds,inlier_threshold:float,attention_window:AttentionWindow=None,  use_AKAZE = False,frame_id=0,verbose=False)->Tuple[Transform, float]:
     if verbose:
-        print("auto_compute_cam2_transform")
-        print(f"estimatedTransform {estimatedTransform}")
-        print(f"bnds {transformBounds}")
+        logger.debug('auto_compute_cam2_transform')
+        logger.debug(f'estimatedTransform {estimatedTransform}')
+        logger.debug(f'bnds {transformBounds}')
 
     times={
-        "pre":0,
-        "getRefinedTransformFromKPMatching":0,
-        "inliers":0,
-        "post":0
+        'pre':0,
+        'getRefinedTransformFromKPMatching':0,
+        'inliers':0,
+        'post':0
     }
 
-    detectorManager = OrbDescriptorManager()
-    detectorManager = AkazeDescriptorManager()
+
+    detectorManager = AkazeDescriptorManager if use_AKAZE else OrbDescriptorManager()
+
     #num_elements = int(len(matched1)*0.5)
     num_elements = 3
     max_iter = 500
     prob = 0.95
     start = time.time()
 
-    if False:
-        kpts1, desc1 = detectorManager.detectAndComputeKPandDescriptors_zone(imLeft,top_limit=topLimit,bottom_limit=bottomLimit,wished_nb_kpts=4000)
-        kpts2, desc2 = detectorManager.detectAndComputeKPandDescriptors_zone(imRight,top_limit=topLimit,bottom_limit=bottomLimit,wished_nb_kpts=4000)
-    else:
-        kpts1, desc1 = detectorManager.detectAndComputeKPandDescriptors(imLeft,attentionWindow=attention_window)
-        kpts2, desc2 = detectorManager.detectAndComputeKPandDescriptors(imRight,attentionWindow=attention_window)
+    kpts1, desc1 = detectorManager.detectAndComputeKPandDescriptors(imLeft,attentionWindow=attention_window)
+    kpts2, desc2 = detectorManager.detectAndComputeKPandDescriptors(imRight,attentionWindow=attention_window)
     
     #kpts to uv
     uv1 = np.array([[k.pt[0], k.pt[1]] for k in kpts1])
     uv2 = np.array([[k.pt[0], k.pt[1]] for k in kpts2])
 
     good_matches = detectorManager.getMatches(desc1, desc2)
-    print("nb keypoints",len(kpts1))
-    print(f'nb good matches {len(good_matches)} ')
+    logger.debug(f'{frame_id} nb keypoints {len(kpts1)}')
+    logger.debug(f'{frame_id} nb good matches {len(good_matches)} ')
     #good_matches = good_matches[:100]
     
     query_indices = [m.queryIdx for m in good_matches]
@@ -177,15 +169,15 @@ def auto_compute_cam2_transform(imLeft:cv2.Mat, imRight:cv2.Mat, estimatedTransf
                                     ) 
   
         # saving the image  
-        cv2.imwrite(get_ouput_path('Match.jpg'), Matched)
+        cv2.imwrite(get_output_path(f'{frame_id}_Match.jpg'), Matched)
         #cv2.waitKey(0)
-        print(f'nb good matches {len(matched1)} ')
+        logger.debug(f'{frame_id} nb good matches {len(matched1)} ')
     nb_iter = 0
     nb_good_matches = len(matched1)
     best_nb_inliers = 0
     best_transform:Transform = None
     endProcessing = time.time()
-    times["pre"] = endProcessing-start
+    times['pre'] = endProcessing-start
     time_in_getRefined=0
     time_in_inliers=0
     time_in_post=0
@@ -216,7 +208,7 @@ def auto_compute_cam2_transform(imLeft:cv2.Mat, imRight:cv2.Mat, estimatedTransf
             best_nb_inliers = nb_inliers
             if nb_inliers == nb_good_matches:
                 if verbose:
-                    print("all inliers")
+                    logger.debug(f'{frame_id} all inliers')
                 max_iter=-1
             else:
                 #update the number of iterations
@@ -229,12 +221,12 @@ def auto_compute_cam2_transform(imLeft:cv2.Mat, imRight:cv2.Mat, estimatedTransf
                     d= distances[i]/clipValue
                     color = (0., int(255*(1.-d)),int(255*d)) 
                     cv2.circle(debug_image, (int(matched1[i][0]), int(matched1[i][1])), 10, color, -1)
-                d_path=get_ouput_path(f"debug{nb_iter}.png")
+                d_path=get_output_path(f'{frame_id}_debug{nb_iter}.png')
                 cv2.imwrite(d_path, debug_image)
 
-                print(f'new best result with {nb_inliers} inliers, iteration is {nb_iter}, residual_per_num_elements is {residual_per_num_elements}')
-                print("optimized_params", refine_transform)
-                print(f"now iter is {nb_iter} and max_iter is {max_iter}")
+                logger.debug(f'{frame_id} new best result with {nb_inliers} inliers, iteration is {nb_iter}, residual_per_num_elements is {residual_per_num_elements}')
+                logger.debug(f'{frame_id} optimized_params: {refine_transform}')
+                logger.debug(f'{frame_id} now iter is {nb_iter} and max_iter is {max_iter}')
         nb_iter+=1
     
     refine_results= True
@@ -251,37 +243,37 @@ def auto_compute_cam2_transform(imLeft:cv2.Mat, imRight:cv2.Mat, estimatedTransf
         inliersIndices,_ = computeInliersIndices(optimized_R, optimized_t, matched1, matched2, inlier_threshold, imLeft.shape[1], imLeft.shape[0])
         nb_inliers = len(inliersIndices)
         if verbose:
-            print(f'refined best result with {nb_inliers} inliers vs {best_nb_inliers}')
+            logger.debug(f'refined best result with {nb_inliers} inliers vs {best_nb_inliers}')
         if nb_inliers > best_nb_inliers:
             best_transform = refine_transform
             best_nb_inliers=nb_inliers
             if verbose:
                 
-                #best_result["max_inliers"] = nb_inliers
-                #best_result["R"] = optimized_R
-                #best_result["t"] = optimized_t
-                print("refined optimized_params on all inliers", refine_transform)
+                #best_result['max_inliers'] = nb_inliers
+                #best_result['R'] = optimized_R
+                #best_result['t'] = optimized_t
+                logger.debug(f'refined optimized_params on all inliers {refine_transform}')
 
-    times["getRefinedTransformFromKPMatching"]=time_in_getRefined
-    times["inliers"]=time_in_inliers
-    times["post"]=time_in_post
-    times["total"]=time.time()-start
+    times['getRefinedTransformFromKPMatching']=time_in_getRefined
+    times['inliers']=time_in_inliers
+    times['post']=time_in_post
+    times['total']=time.time()-start
 
     if verbose:
-        print(times)
+        logger.debug(times)
 
     return best_transform,best_nb_inliers/nb_good_matches
 
 def compute_stereo_matched_KP(imLeft:cv2.Mat, imRight:cv2.Mat, camRightTransform: Transform,inlier_threshold:float,attention_window:AttentionWindow,  mask_left, mask_right, verbose=False)->Tuple[Transform, float]:
     if verbose:
-        print("auto_compute_cam2_transform")
-        print(f"camRightTransform {camRightTransform}")
+        logger.debug('compute_stereo_matched_KP')
+        logger.debug(f'camRightTransform {camRightTransform}')
 
     times={
-        "pre":0,
-        "getRefinedTransformFromKPMatching":0,
-        "inliers":0,
-        "post":0
+        'pre':0,
+        'getRefinedTransformFromKPMatching':0,
+        'inliers':0,
+        'post':0
     }
 
     detectorManager = OrbDescriptorManager(nfeatures=5000)
@@ -297,8 +289,8 @@ def compute_stereo_matched_KP(imLeft:cv2.Mat, imRight:cv2.Mat, camRightTransform
     uv2 = np.array([[k.pt[0], k.pt[1]] for k in kpts2])
 
     good_matches = detectorManager.getMatches(desc1, desc2)
-    print("nb keypoints",len(kpts1))
-    print(f'nb good matches {len(good_matches)} ')
+    logger(f'nb keypoints {len(kpts1)}')
+    logger(f'nb good matches {len(good_matches)} ')
     #good_matches = good_matches[:100]
     
     query_indices = [m.queryIdx for m in good_matches]
@@ -323,12 +315,12 @@ def compute_stereo_matched_KP(imLeft:cv2.Mat, imRight:cv2.Mat, camRightTransform
                                     ) 
   
         # saving the image  
-        cv2.imwrite(get_ouput_path('Match.jpg'), Matched)
+        cv2.imwrite(get_output_path('Match.jpg'), Matched)
         #cv2.waitKey(0)
-        print(f'nb good matches {len(matched1)} ')
+        logger(f'nb good matches {len(matched1)} ')
 
     endProcessing = time.time()
-    times["pre"] = endProcessing-start
+    times['pre'] = endProcessing-start
     time_in_getRefined=0
     time_in_inliers=0
     time_in_post=0
@@ -354,17 +346,17 @@ def compute_stereo_matched_KP(imLeft:cv2.Mat, imRight:cv2.Mat, camRightTransform
     debug_image = imLeft.copy()
     for p in sub_uv1:
         cv2.circle(debug_image, (int(p[0]), int(p[1])), 2, (0,255,0), -1)
-    d_path=get_ouput_path(f"debug_road.png")
+    d_path=get_output_path(f'debug_road.png')
     cv2.imwrite(d_path, debug_image)
         
 
-    times["getRefinedTransformFromKPMatching"]=time_in_getRefined
-    times["inliers"]=time_in_inliers
-    times["post"]=time_in_post
-    times["total"]=time.time()-start
+    times['getRefinedTransformFromKPMatching']=time_in_getRefined
+    times['inliers']=time_in_inliers
+    times['post']=time_in_post
+    times['total']=time.time()-start
 
     if verbose:
-        print(times)
+        logger.debug(times)
 
     return sub_uv1,sub_uv2,P1,P2
 

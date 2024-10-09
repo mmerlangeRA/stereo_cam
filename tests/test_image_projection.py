@@ -3,7 +3,7 @@ set_paths()
 
 import cv2
 
-from src.utils.path_utils import get_ouput_path
+from src.utils.path_utils import get_output_path
 from src.road_detection.common import AttentionWindow
 from src.utils.equirectangular.equirectangular_mapper import EquirectangularMapper
 from src.utils.equirectangular.SignMatcherClass import SignMatcher
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     
 
     cropped = signWindow.crop_image(equirect_image)
-    cv2.imwrite(get_ouput_path('cropped.png'), cropped)
+    cv2.imwrite(get_output_path('cropped.png'), cropped)
     #cv2.imshow("cropped",cropped)
     
 
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         equi_width=equirect_width,
          equi_height=equirect_height )
     blended = cv2.addWeighted(equirect_image, 0.5, equirect_sign_image, 0.5, 0)
-    cv2.imwrite(get_ouput_path('equirect_sign_image.png'), blended)
+    cv2.imwrite(get_output_path('equirect_sign_image.png'), blended)
 
 
     optimizedTransform = signMatcher.optimize_sign_position_and_orientation(
@@ -85,6 +85,6 @@ if __name__ == "__main__":
     for u,v in zip(us,vs):
         cv2.circle(blended, (int(u), int(v)), 5, (0, 0, 255), 1)
         
-    cv2.imwrite(get_ouput_path('optimized.png'), blended)
+    cv2.imwrite(get_output_path('optimized.png'), blended)
 
 

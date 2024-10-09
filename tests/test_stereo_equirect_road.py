@@ -7,7 +7,7 @@ import time
 from src.road_detection.RoadSegmentator import PIDNetRoadSegmentator, SegFormerRoadSegmentator
 from src.road_detection.RoadDetector import EquirectMonoRoadDetector, EquirectStereoRoadDetector
 from src.road_detection.common import AttentionWindow
-from src.utils.path_utils import get_ouput_path
+from src.utils.path_utils import get_output_path
 
 from src.utils.TransformClass import Transform
 
@@ -34,8 +34,8 @@ limit_top = int(window_top * height)
 limit_bottom = int(window_bottom * height)
 window = AttentionWindow(limit_left, limit_right, limit_top, limit_bottom)
 
-cv2.imwrite(get_ouput_path('road_window_left.png'), window.crop_image(img_left))
-cv2.imwrite(get_ouput_path('road_window_right.png'), window.crop_image(img_right))
+cv2.imwrite(get_output_path('road_window_left.png'), window.crop_image(img_left))
+cv2.imwrite(get_output_path('road_window_right.png'), window.crop_image(img_right))
 initialization_time = time.time()
 roadSegmentator = SegFormerRoadSegmentator(kernel_width=20, use_1024=False, debug=debug)
 end_time = time.time()

@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import torch
 from src.pidnet.main import segment_image
-from src.utils.path_utils import get_ouput_path, get_static_folder_path
+from src.utils.path_utils import get_output_path, get_static_folder_path
 from typing import Tuple, List, Optional
 import numpy.typing as npt
 from src.road_detection.seg_former import SegFormerEvaluater
@@ -12,10 +12,14 @@ from src.road_detection.seg_former import SegFormerEvaluater
 class RoadSegmentator:
     kernel_width: int
     debug: bool
+    frame_id: int=0
     def __init__(self, kernel_width=10, debug=False):
         self.kernel_width = kernel_width
         self.debug = debug
     
+    def set_frame_id(self, frame_id: int):
+        self.frame_id = frame_id
+
     @abstractmethod
     def get_segmented_image_and_pred_and_road_label(self, img: npt.NDArray[np.uint8]) -> Tuple[npt.NDArray[np.uint8], any, int]:
         pass
@@ -31,8 +35,8 @@ class RoadSegmentator:
         """
         segmented_image, pred,road_label = self.get_segmented_image_and_pred_and_road_label(img)
         if self.debug:
-            img_name = "segmented.png" 
-            cv2.imwrite(get_ouput_path(img_name), segmented_image)
+            img_name = f"{self.frame_id}_segmented.png" 
+            cv2.imwrite(get_output_path(img_name), segmented_image)
             #cv2.imshow("segmented_image",segmented_image)
         # Create a mask for the road class
         road_mask = (pred == road_label).astype(np.uint8)

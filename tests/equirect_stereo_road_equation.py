@@ -9,7 +9,7 @@ from src.road_detection.common import AttentionWindow
 
 from src.utils.curve_fitting import Road_line_params, find_best_2_polynomial_curves, vizualize_road_equirectangular
 from src.utils.TransformClass import Transform
-from src.utils.path_utils import get_ouput_path
+from src.utils.path_utils import get_output_path
 
 if __name__ == '__main__':
     img_left_path=r'C:\Users\mmerl\projects\stereo_cam\data\Photos\P5\D_P5_CAM_G_2_EAC.png'
@@ -56,8 +56,8 @@ if __name__ == '__main__':
     roadSegmentator = SegFormerRoadSegmentator(kernel_width=10, use_1024=True, debug=True)
     roadDetector = EquirectMonoRoadDetector(roadSegmentator=roadSegmentator,window=window,road_down_y=camHeight, degree=degree, debug=False)
     
-    cv2.imwrite(get_ouput_path( "window_left.png"),window.crop_image(img_left))
-    cv2.imwrite(get_ouput_path( "window_right.png"),window.crop_image(img_right))
+    cv2.imwrite(get_output_path( "window_left.png"),window.crop_image(img_left))
+    cv2.imwrite(get_output_path( "window_right.png"),window.crop_image(img_right))
     
     left_countours=roadDetector._get_road_contours(img_left)
     right_countours=roadDetector._get_road_contours(img_right)
@@ -110,7 +110,7 @@ if __name__ == '__main__':
     for p in right_contour_left:
         cv2.circle(img_right, p, 2, (255, 0, 0), -1)
     
-    cv2.imwrite(get_ouput_path("superleft.png"),img_left)
+    cv2.imwrite(get_output_path("superleft.png"),img_left)
     vizualize_road_equirectangular(initial_guess, cam_left_transform, img_left,'initleft')
     vizualize_road_equirectangular(initial_guess, cam_right_transform, img_right, "initright")
     

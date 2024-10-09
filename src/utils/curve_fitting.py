@@ -18,8 +18,10 @@ from scipy.spatial.distance import cdist
 
 from src.utils.TransformClass import Transform
 from src.utils.coordinate_transforms import cartesian_to_equirectangular
-from src.utils.path_utils import get_ouput_path
+from src.utils.path_utils import get_output_path
+from src.logger import get_logger
 
+logger = get_logger(__name__)
 
 class Road_line_params:
     '''
@@ -67,7 +69,7 @@ def vizualize_road_equirectangular(road_line_params: Road_line_params, camRight:
     for u, v in zip(u2, v2):
         cv2.circle(debug_img, (u, v), 2, (0, 255, 0), -1)
 
-    cv2.imwrite(get_ouput_path(f'{debug_name}.png'), debug_img)
+    cv2.imwrite(get_output_path(f'{debug_name}.png'), debug_img)
 
 def compute_residuals(params, data_cam1, data_cam2, camRight:Transform,image_width,image_height)->np.array:
     """
@@ -107,7 +109,7 @@ def compute_residuals(params, data_cam1, data_cam2, camRight:Transform,image_wid
     residuals_cam2 = compute_point_line_distances(data_cam2, u2, v2)
     nb_points = len(residuals_cam1) + len(residuals_cam2)
     residuals = np.concatenate((residuals_cam1, residuals_cam2))
-    print(np.sum(residuals)/(len(data_cam1)+len(data_cam2)))
+    #print(np.sum(residuals)/(len(data_cam1)+len(data_cam2)))
     return residuals
 
 def compute_point_line_distances(points, u_line, v_line):
@@ -154,8 +156,11 @@ def fit_polynomial_ransac(
     - poly_model: Fitted polynomial model.
     - inlier_mask: Mask of inliers detected by RANSAC.
     """
-    if len(x) != len(y) or len(x) == 0:
-        raise ValueError("x and y must have the same non-zero length")
+    if len(x) != len(y) or len(x) <5:
+        logger.error(f"x and y must have the same length above 5 not {len(x)} {len(y)} ")
+        return None, np.zeros(len(x)), None
+
+    
     poly_model = make_pipeline(
         PolynomialFeatures(degree), 
         RANSACRegressor(residual_threshold=residual_threshold,max_trials=200)
@@ -176,8 +181,8 @@ def fit_polynomial_ransac(
     
     return poly_model, inlier_mask,final_coefficients
 
-def find_best_2_best_contours(
-    contour: npt.NDArray[np.int32], 
+def find_best_2_best_polynomial_contours(
+    contour_points: npt.NDArray[np.int32], 
     degree: int = 2, 
     max_pixel_distance: float = 10
 ) -> Tuple[make_pipeline, make_pipeline, npt.NDArray[np.bool_], npt.NDArray[np.bool_]]:
@@ -195,13 +200,15 @@ def find_best_2_best_contours(
     - inliers_first: Boolean mask of inliers for the left polynomial fit.
     - inliers_second_full: Boolean mask of inliers for the right polynomial fit over the initial data.
     """
-    contour_points = contour[:, 0, :]
+    #contour_points = contour[:, 0, :]
     x = contour_points[:, 0]
     y = contour_points[:, 1]
 
     # Fit the first polynomial curve using RANSAC
     first_poly_model, inliers_first,_ = fit_polynomial_ransac(y, x, degree, residual_threshold=max_pixel_distance)
-
+    if first_poly_model is None:
+        return None, None, None, None
+    
     # Identify outliers from the first fit
     outlier_indices = np.where(~inliers_first)[0]
     x_outliers = x[outlier_indices]
@@ -243,7 +250,7 @@ def find_best_2_polynomial_curves(contour: npt.NDArray[np.int32],degree=2,max_pi
     y = contour_points[:, 1]
    
 
-    first_poly_model,second_poly_model, inliers_first, inliers_second =find_best_2_best_contours(contour=contour,degree=degree,max_pixel_distance=max_pixel_distance)
+    first_poly_model,second_poly_model, inliers_first, inliers_second =find_best_2_best_polynomial_contours(contour=contour,degree=degree,max_pixel_distance=max_pixel_distance)
     y_inliers_first = y[inliers_first]
     y_inliers_second = y[inliers_second]
     return first_poly_model, second_poly_model, y_inliers_first, y_inliers_second

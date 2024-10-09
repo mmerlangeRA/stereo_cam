@@ -24,6 +24,9 @@ class Transform:
         self.yaw = yaw
         self.roll = roll
 
+    def __str__(self)->str:
+        return f"xc={self.xc}, yc={self.yc}, zc={self.zc}, pitch={self.pitch}, yaw={self.yaw}, roll={self.roll}"
+
     def as_array(self)->np.array:
        return np.array([
         self.xc,

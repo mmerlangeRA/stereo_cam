@@ -5,17 +5,17 @@ import sys
 from src.utils.cube_image import get_cube_front_image
 
 gettrace = getattr(sys, 'gettrace', None)
-debug_monde = False
+is_debug_mode = False
 if gettrace is None:
     print('No sys.gettrace')
 elif gettrace():
-    debug_monde = True
+    is_debug_mode = True
     print('Debugging mode')
 else:
     print("Standard mode")
 
 def get_root() -> str:
-    if debug_monde:
+    if is_debug_mode:
         return r'C:\Users\mmerl\projects\stereo_cam'
     return os.getcwd() 
 
@@ -26,7 +26,7 @@ def get_data_path(path="") -> str:
     data_path= os.path.join(data_folder_path, path)
     return data_path
 
-def get_ouput_path(path="") -> str:
+def get_output_path(path="") -> str:
     output_folder_path = os.path.join(get_root(), "output")
     if not os.path.exists(output_folder_path):
         os.makedirs(output_folder_path)

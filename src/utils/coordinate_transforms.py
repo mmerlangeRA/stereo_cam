@@ -6,6 +6,7 @@ from scipy.spatial.transform import Rotation as R
 
 from src.utils.intersection_utils import compute_intersection_rays_plane, compute_plane_coordinates, get_plane_P0_and_N_from_transform
 from src.utils.TransformClass import Transform
+import numpy as N
 
 def rotation_matrix_from_vector3D(params: List[float]) -> np.ndarray:
     """Construct a rotation matrix from parameters."""
@@ -220,23 +221,92 @@ def get_extrinsic_matrix_from_rvec_tvec(rvec:np.array, tvec:np.array)->np.array:
 
 def equirect_to_road_points3D(imgWidth:int, imgHeight:int,road_plane_transform:Transform,contour_x,contour_y):
     # We assume world is the camera referential and we want projection on road plane
-    # road_vec is transformation of the road in world space
+    # road_plane_transform is transform of the road in world space
     P0,N = get_plane_P0_and_N_from_transform(road_plane_transform)
     
-    #let'sintersect rays with plane road.
-
+    #let's intersect rays with road plane
     theta, phi = pixel_to_spherical (imgWidth, imgHeight,contour_x, contour_y)
     world_ray = spherical_to_cartesian(theta, phi)
     road_points3D = compute_intersection_rays_plane(world_ray, P0, N)
 
     return road_points3D
 
-def equirect_to_road_plane_points2D(imgWidth:int, imgHeight:int,plane_transform:Transform,contour_x,contour_y):
+
+def equirect_to_road_plane_points2D_old(imgWidth:int, imgHeight:int,plane_transform:Transform,contour_x,contour_y):
     # We assume world is the camera referential and we want projection on road plane
     road_points3D = equirect_to_road_points3D(imgWidth, imgHeight, plane_transform, contour_x, contour_y)
-    road_points_2D=compute_plane_coordinates(road_points3D,plane_transform)
+    road_points_2D = compute_plane_coordinates(road_points3D,plane_transform)
     road_points_2D = road_points3D[:,[0, 2]]
     return road_points_2D
+
+# start test
+
+def compute_plane_basis(N_plane):
+    # Normalize the normal vector
+    w = N_plane / np.linalg.norm(N_plane)
+    
+    # Choose an arbitrary vector not parallel to w
+    if not np.allclose(w, [0, 0, 1]):
+        a = np.array([0, 0, 1])
+    else:
+        a = np.array([0, 1, 0])
+    
+    # Compute u = a × w
+    u = np.cross(a, w)
+    u /= np.linalg.norm(u)
+    
+    # Compute v = w × u
+    v = np.cross(w, u)
+    v /= np.linalg.norm(v)
+    
+    return u, v, w
+
+def compute_rotation_matrix(u, v, w):
+    # Rotation matrix from plane to world coordinates
+    R_plane_to_world = np.column_stack((u, v, w))
+    # Rotation matrix from world to plane coordinates is the transpose
+    R_world_to_plane = R_plane_to_world.T
+    return R_world_to_plane
+
+def transform_origin_rays_to_new_ref(rays_world:np.ndarray, ref_transform:Transform):
+    # Ray origins in plane coordinates
+    
+    world_to_ref_rotation_matrix = ref_transform.inverseRotationMatrix
+    world_to_ref_translation = -ref_transform.translationVector
+    #ray_origin_world = np.zeros(3)
+    #new_rays_origin = world_to_ref_rotation_matrix @ (ray_origin_world + world_to_ref_translation)
+    new_rays_origin = world_to_ref_translation
+    
+    # Ray directions in plane coordinates
+    new_rays = (world_to_ref_rotation_matrix @ rays_world.T).T
+    return new_rays_origin, new_rays
+
+
+def compute_world_rays_intersections_in_plane_referential2D(rays_world:np.ndarray, road_transform:Transform)-> np.ndarray:
+    '''
+    We compute intersection of rays from orgin in world space with the road plane specified by road_transform
+    Intersection is at y =0 in road plane referential
+    Then we return array of x,z coordinates in plane referential
+    '''
+    new_rays_origin, new_rays = transform_origin_rays_to_new_ref(rays_world,road_transform)
+    #we assume interesection is at y=0 on the road plane
+    lambdas = -new_rays_origin[1] / new_rays[:, 1]
+    intersections3D = new_rays_origin + lambdas[:, np.newaxis] * new_rays
+
+    plane_coords = intersections3D[:,[0,2]]
+
+    return plane_coords
+
+
+def equirect_to_road_plane_points2D(imgWidth:int, imgHeight:int,plane_transform:Transform,contour_x,contour_y):
+    # We assume world is the camera referential and we want projection on road plane
+    theta, phi = pixel_to_spherical (imgWidth, imgHeight,contour_x, contour_y)
+    world_ray = spherical_to_cartesian(theta, phi)
+    #P0,N=get_plane_P0_and_N_from_transform(plane_transform=plane_transform)
+    plane_coords=compute_world_rays_intersections_in_plane_referential2D(world_ray,plane_transform)
+
+    #test_plane_coords = equirect_to_road_plane_points2D_old(imgWidth, imgHeight, plane_transform, contour_x, contour_y)
+    return plane_coords
 
 def intersect_ray_plane(plane_coeffs, ray_direction):
     # plane equation is ax+by+cz+d=0
