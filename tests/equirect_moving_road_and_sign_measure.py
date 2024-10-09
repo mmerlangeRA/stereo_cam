@@ -18,6 +18,23 @@ from src.road_detection.StereoEquirectStereoDetector import EquirectStereoRoadDe
 
 
 frames =[
+            {
+        "frame_id": 0,
+        "imgLeft" :r"C:\Users\mmerl\projects\stereo_cam\data\Photos\P3\D_P3_CAM_G_0_EAC.png",
+        "imgRight":r"C:\Users\mmerl\projects\stereo_cam\data\Photos\P3\D_P3_CAM_D_0_EAC.png",
+        "keypoints_camL": [ 
+             [3034, 1258],
+            [3100.0, 1258.0],
+            [3100.0,1328.0],
+            [3034.0, 1329.0]
+        ],
+        "keypoints_camR": [
+             [2851, 1268],
+             [2926.0,1265.0],
+             [2926.0, 1343.0],
+             [2853, 1342]
+        ]
+    },
         {
         "frame_id": 1,
         "imgLeft" :r"C:\Users\mmerl\projects\stereo_cam\data\Photos\P5\D_P5_CAM_G_2_EAC.png",
@@ -157,44 +174,47 @@ best_camRight_transform_estimation = Transform(xc=1.1100000000010084, yc=-0.0153
 best_camRight_transform_estimation.scale_translation_from_x(baseline=base_line)
 transformBounds= TransformBounds(baseline=base_line, dt_max_y=dt_max_y,dt_max_z=dt_max_z, angle_max=angle_max)
 
+verbose = True 
+
 #road detection parameters
 window_left=0.4
 window_right = 0.6
-road_window_top = 0.53
 window_top = 0.4
 window_bottom = 0.8
-road_debug = True
-camHeight = 1.65
-degree= 1
 
-# Attention window for segementation and road detection
+camHeight = 1.9
+polynomial_degree= 1
+road_debug = True
+
+
+# Attention window for segmentation and road detection
 limit_left = int(window_left * image_width)
 limit_right = int(window_right * image_width)
 limit_top = int(window_top * image_height)
 limit_bottom = int(window_bottom * image_height)
 window = AttentionWindow(limit_left, limit_right, limit_top, limit_bottom)
 
-
 roadSegmentator = SegFormerRoadSegmentator(kernel_width=20, use_1024=True, debug=road_debug)
 roadDetector = EquirectStereoRoadDetector(roadSegmentator=roadSegmentator,
                                           window=window, 
-                                          degree=degree, 
+                                          degree=polynomial_degree, 
                                           camRight_transform=best_camRight_transform_estimation,
                                         debug=road_debug)
-initialization_end_time = time.time()
+roadDetector.set_road_vector_and_bounds(road_width=6., road_transform=Transform(0.,camHeight,0.,0.,0.,0.),maxDy=0.01)
 
+initialization_end_time = time.time()
 print("Time taken for initialization: ", round(initialization_end_time - initialization_start_time,1), "seconds")
 
-verbose = True 
-
 computed=[]
+
+frames = frames[0:1]
 
 for frame in frames:
     frameId=frame["frame_id"]
     roadDetector.set_frame_id(frameId)
     invert_left_right = frame["keypoints_camL"][0][0]<frame["keypoints_camR"][0][0]
 
-    print(frameId,invert_left_right)
+    print(f"*****computing {frameId}*******" )
     
     name_left_kps = "keypoints_camR" if invert_left_right else "keypoints_camL"
     name_right_kps = "keypoints_camL" if invert_left_right else "keypoints_camR"
@@ -243,7 +263,7 @@ for frame in frames:
     start_time = time.time()
     roadDetector.set_camRight_transform(best_camRight_transform_estimation)
     concatenated_horizontal_img = np.concatenate((left_image, right_image), axis=1)
-    road_width = roadDetector.compute_road_width(concatenated_horizontal_img)
+    road_width,cost = roadDetector.compute_road_width(concatenated_horizontal_img)
     end_time = time.time()
     if verbose:
         cv2.imwrite(get_output_path(f'{frameId}_road_window_left.png'), window.crop_image(left_image))
@@ -252,7 +272,7 @@ for frame in frames:
             print("No road detected")
         else:
             print(f'road_width {road_width} in {round(end_time- start_time,1)}')
-            road_vector = roadDetector.road_vector
+            road_vector = roadDetector.estimated_road_vector
             left_cam_transform = Transform()
             debug_img =roadDetector._debug_display_projected_road_on_image(left_image,roadDetector.left_img_contour_left, roadDetector.left_img_contour_right,left_cam_transform,road_vector)
             cv2.imwrite(get_output_path(f'{frameId}_road_debug_left.png'), debug_img)

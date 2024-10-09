@@ -25,7 +25,7 @@ class RoadSegmentator:
         pass
 
     
-    def segment_road_image(self, img: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
+    def segment_road_image(self, img: npt.NDArray[np.uint8],prefix="") -> npt.NDArray[np.uint8]:
         """
             Computes binary image corresponding to road.
             Parameters:
@@ -35,7 +35,7 @@ class RoadSegmentator:
         """
         segmented_image, pred,road_label = self.get_segmented_image_and_pred_and_road_label(img)
         if self.debug:
-            img_name = f"{self.frame_id}_segmented.png" 
+            img_name = f"{self.frame_id}_{prefix}_segmented.png" 
             cv2.imwrite(get_output_path(img_name), segmented_image)
             #cv2.imshow("segmented_image",segmented_image)
         # Create a mask for the road class

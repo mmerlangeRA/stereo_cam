@@ -201,6 +201,9 @@ def find_best_2_best_polynomial_contours(
     - inliers_second_full: Boolean mask of inliers for the right polynomial fit over the initial data.
     """
     #contour_points = contour[:, 0, :]
+    if contour_points.shape[1]!=2:
+        contour_points = contour_points.squeeze(axis=1)
+
     x = contour_points[:, 0]
     y = contour_points[:, 1]
 

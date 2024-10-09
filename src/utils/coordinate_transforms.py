@@ -219,58 +219,8 @@ def get_extrinsic_matrix_from_rvec_tvec(rvec:np.array, tvec:np.array)->np.array:
     return RT
 
 
-def equirect_to_road_points3D(imgWidth:int, imgHeight:int,road_plane_transform:Transform,contour_x,contour_y):
-    # We assume world is the camera referential and we want projection on road plane
-    # road_plane_transform is transform of the road in world space
-    P0,N = get_plane_P0_and_N_from_transform(road_plane_transform)
-    
-    #let's intersect rays with road plane
-    theta, phi = pixel_to_spherical (imgWidth, imgHeight,contour_x, contour_y)
-    world_ray = spherical_to_cartesian(theta, phi)
-    road_points3D = compute_intersection_rays_plane(world_ray, P0, N)
-
-    return road_points3D
-
-
-def equirect_to_road_plane_points2D_old(imgWidth:int, imgHeight:int,plane_transform:Transform,contour_x,contour_y):
-    # We assume world is the camera referential and we want projection on road plane
-    road_points3D = equirect_to_road_points3D(imgWidth, imgHeight, plane_transform, contour_x, contour_y)
-    road_points_2D = compute_plane_coordinates(road_points3D,plane_transform)
-    road_points_2D = road_points3D[:,[0, 2]]
-    return road_points_2D
-
-# start test
-
-def compute_plane_basis(N_plane):
-    # Normalize the normal vector
-    w = N_plane / np.linalg.norm(N_plane)
-    
-    # Choose an arbitrary vector not parallel to w
-    if not np.allclose(w, [0, 0, 1]):
-        a = np.array([0, 0, 1])
-    else:
-        a = np.array([0, 1, 0])
-    
-    # Compute u = a × w
-    u = np.cross(a, w)
-    u /= np.linalg.norm(u)
-    
-    # Compute v = w × u
-    v = np.cross(w, u)
-    v /= np.linalg.norm(v)
-    
-    return u, v, w
-
-def compute_rotation_matrix(u, v, w):
-    # Rotation matrix from plane to world coordinates
-    R_plane_to_world = np.column_stack((u, v, w))
-    # Rotation matrix from world to plane coordinates is the transpose
-    R_world_to_plane = R_plane_to_world.T
-    return R_world_to_plane
-
 def transform_origin_rays_to_new_ref(rays_world:np.ndarray, ref_transform:Transform):
     # Ray origins in plane coordinates
-    
     world_to_ref_rotation_matrix = ref_transform.inverseRotationMatrix
     world_to_ref_translation = -ref_transform.translationVector
     #ray_origin_world = np.zeros(3)
@@ -280,7 +230,6 @@ def transform_origin_rays_to_new_ref(rays_world:np.ndarray, ref_transform:Transf
     # Ray directions in plane coordinates
     new_rays = (world_to_ref_rotation_matrix @ rays_world.T).T
     return new_rays_origin, new_rays
-
 
 def compute_world_rays_intersections_in_plane_referential2D(rays_world:np.ndarray, road_transform:Transform)-> np.ndarray:
     '''
@@ -297,7 +246,6 @@ def compute_world_rays_intersections_in_plane_referential2D(rays_world:np.ndarra
 
     return plane_coords
 
-
 def equirect_to_road_plane_points2D(imgWidth:int, imgHeight:int,plane_transform:Transform,contour_x,contour_y):
     # We assume world is the camera referential and we want projection on road plane
     theta, phi = pixel_to_spherical (imgWidth, imgHeight,contour_x, contour_y)
@@ -307,56 +255,6 @@ def equirect_to_road_plane_points2D(imgWidth:int, imgHeight:int,plane_transform:
 
     #test_plane_coords = equirect_to_road_plane_points2D_old(imgWidth, imgHeight, plane_transform, contour_x, contour_y)
     return plane_coords
-
-def intersect_ray_plane(plane_coeffs, ray_direction):
-    # plane equation is ax+by+cz+d=0
-    # Unpack the plane normal and ray direction
-    a, b, c, d = plane_coeffs
-    dx, dy, dz = ray_direction
-
-    # Compute the denominator (dot product of plane normal and ray direction)
-    denominator = a * dx + b * dy + c * dz
-
-    # Check if the ray is parallel to the plane (denominator is zero)
-    if np.isclose(denominator, 0):
-        return None  # No intersection, the ray is parallel to the plane
-
-    # Compute the value of t
-    t = -d / denominator
-
-    # Calculate the intersection point
-    intersection_point = t * np.array(ray_direction)
-
-    return intersection_point
-    ''' Example usage:
-    plane_params = np.array([1, -1, 2,2])  # Example normal vector (a, b, c)
-    ray_direction = np.array([2, 3, 1])  # Example ray direction (dx, dy, dz)
-
-    intersection = intersect_ray_plane(plane_params, ray_direction)
-
-    if intersection is not None:
-        print(f"Intersection point: {intersection}")
-    else:
-        print("The ray is parallel to the plane, no intersection.")
-    '''
-
-def transform_plane(plane_coeffs, transformation_matrix):
-    # Unpack the plane coefficients
-    a, b, c, d = plane_coeffs
-    
-    # Extract the rotation matrix R and translation vector t from the transformation matrix
-    R = transformation_matrix[:3, :3]
-    t = transformation_matrix[:3, 3]
-    
-    # Compute the normal vector in the new referential
-    normal_vector = np.array([a, b, c])
-    new_normal_vector = np.dot(np.linalg.inv(R).T, normal_vector)
-    
-    # Calculate the new d' value
-    new_d = d - np.dot(new_normal_vector, t)
-    
-    # Return the new plane coefficients (a', b', c', d')
-    return (*new_normal_vector, new_d)
 
 def get_3D_points_to_cam_transform_referential(points3D: np.ndarray, cam_transform: 'Transform') -> np.ndarray:
     """

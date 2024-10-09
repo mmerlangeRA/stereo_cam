@@ -4,14 +4,14 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
-from src.road_detection.RoadDetector import EquirectMonoRoadDetector, RoadDetector
+from src.road_detection.equirect_mono_road_detector import EquirectMonoRoadDetector
 from src.road_detection.RoadSegmentator import PIDNetRoadSegmentator, RoadSegmentator, SegFormerRoadSegmentator
 from src.road_detection.common import AttentionWindow
 import time
 
 
 
-roadDetector: RoadDetector
+roadDetector: EquirectMonoRoadDetector
 roadSegmentator : RoadSegmentator
 former_use_seg = False
 former_use_1024 = False
@@ -73,7 +73,15 @@ if uploaded_file is not None:
     former_use_1024=use_1024
 
     roadDetector = EquirectMonoRoadDetector(roadSegmentator=roadSegmentator,window=window,road_down_y=cam_height_slider, degree=degree_slider, debug=is_debug)
-    average_width, first_poly_model, second_poly_model, x, y = roadDetector.compute_road_width(img)
+    average_width, optimized_transform = roadDetector.compute_road_width(img)
+    first_poly_model=roadDetector.left_poly_model
+    second_poly_model=roadDetector.right_poly_model
+    contour_left = roadDetector.contour_left
+    contour_right = roadDetector.contour_right
+    contour_points = np.concatenate((contour_left, contour_right), axis=0)
+    x= contour_points[:, 0]
+    y = contour_points[:, 1]
+
     end_time = time.time()
     st.write("Temps calcul (s)",round(end_time-start_time,2))
     st.write("Estimation (m)",round(average_width,2))
@@ -102,20 +110,6 @@ if uploaded_file is not None:
     
     st.pyplot(plt)
 
-    #Test
-    x1 = 2167
-    y = 1600
-    x2= 2964
 
-    # x1= 2636
-    # y1 = 1413
-
-    # x2=2782
-    # y2 = 1413
-
-    imgWidth =5376
-    imgHeight = 2688
-    d,p1,p2 = roadDetector.compute_line_width(imgWidth, imgHeight, x1, x2,y,y)
-    print("distance", d, "p1", p1, "p2", p2)
     
 

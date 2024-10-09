@@ -1,12 +1,17 @@
+import torch
 from bootstrap import set_paths
 set_paths()
 import cv2
 
 from src.road_detection.RoadSegmentator import PIDNetRoadSegmentator, SegFormerRoadSegmentator
-from src.road_detection.RoadDetector import EquirectMonoRoadDetector
+from src.road_detection.equirect_mono_road_detector import EquirectMonoRoadDetector
 from src.road_detection.common import AttentionWindow
 from src.utils.path_utils import get_output_path
 import time
+
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+print("device", device)
 
 img_path=r'C:\Users\mmerl\projects\stereo_cam\data\Photos\P5\D_P5_CAM_G_1_EAC.png'
 img = cv2.imread(img_path, cv2.IMREAD_COLOR)
@@ -15,7 +20,6 @@ height, width = img.shape[:2]
 
 window_left=0.4
 window_right = 0.6
-road_window_top = 0.53
 window_top = 0.4
 window_bottom = 0.6
 debug = True
@@ -37,7 +41,7 @@ end_time = time.time()
 print("Time taken for segmentation initialization: ", end_time - initialization_time, "seconds")
 
 start_time = time.time()
-roadDetector = EquirectMonoRoadDetector(roadSegmentator=roadSegmentator,window=window,road_down_y=camHeight, degree=degree, road_contour_top=road_window_top,debug=debug)
+roadDetector = EquirectMonoRoadDetector(roadSegmentator=roadSegmentator,window=window,road_down_y=camHeight, degree=degree,debug=debug)
 road_width,optimized_transform = roadDetector.compute_road_width(img)
 print("optimized_transform",optimized_transform)    
 end_time = time.time()

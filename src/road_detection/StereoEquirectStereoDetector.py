@@ -14,8 +14,7 @@ from src.road_detection.RoadSegmentator import RoadSegmentator
 from src.road_detection.common import AttentionWindow
 from src.utils.TransformClass import Transform
 from src.utils.typing import cvImage
-from src.utils.intersection_utils import get_plane_P0_and_N_from_transform
-from src.road_detection.RoadDetector import RoadDetector,RoadEquationInPlane
+from src.road_detection.RoadDetector import RoadDetector
 from src.utils.curve_fitting import find_best_2_best_polynomial_contours
 
 logger = get_logger(__name__)
@@ -28,6 +27,8 @@ Equation of road on the plane is x from z
 Looks strange
 
 '''
+
+
 
 class EquirectStereoRoadDetector(RoadDetector):
     '''
@@ -42,21 +43,24 @@ class EquirectStereoRoadDetector(RoadDetector):
     - right_img_contour_left, right_img_contour_right: left and right road contours found on left image. Kept for debug purposes
       will be searched only within this portion of the image (0-1 range).
     '''
+    #Assumptions for optimization
     camRight_transform:Transform
-    
-    left_img_contour_left: Sequence[np.ndarray]=[]
-    left_img_contour_right: Sequence[np.ndarray] =[]
-    right_img_contour_left: Sequence[np.ndarray] =[]
-    right_img_contour_right: Sequence[np.ndarray] =[]
     #road_width, xc, yc, pitch, yaw, roll
-    road_vector : np.array =np.array([6.,0.,1.65,0.,0.,0.])
+    estimated_road_vector : np.array =np.array([6.,0.,1.65,0.,0.,0.])
     lower_bounds : np.array = np.array([2, -5., 1.65, -20*np.pi/180, -45*np.pi/180,-20*np.pi/180])
     upper_bounds : np.array = np.array([ 12,  0., 2.5, 20*np.pi/180, 45*np.pi/180, 20*np.pi/180])
 
     min_z_for_road:float
     max_z_for_road:float
-    image_height = 2688
-    image_width = 5376
+    image_height:int
+    image_width:int
+
+    #solution
+    optimized_road_vector : np.array =np.array([6.,0.,1.65,0.,0.,0.])
+    left_img_contour_left: Sequence[np.ndarray]=[]
+    left_img_contour_right: Sequence[np.ndarray] =[]
+    right_img_contour_left: Sequence[np.ndarray] =[]
+    right_img_contour_right: Sequence[np.ndarray] =[]
 
     def __init__(self, 
                  roadSegmentator: RoadSegmentator, 
@@ -65,6 +69,8 @@ class EquirectStereoRoadDetector(RoadDetector):
                  camRight_transform=Transform(1.12,0.,0.,0.,0.,0.),
                  min_z_for_road =5.,
                  max_z_for_road = 15.,
+                 image_width= 5376,
+                 image_height= 2688,
                  debug: bool = False) -> None:
         '''
         Initializes the EquirectRoadDetector.
@@ -81,10 +87,11 @@ class EquirectStereoRoadDetector(RoadDetector):
         self.camRight_transform = camRight_transform
         self.min_z_for_road = min_z_for_road
         self.max_z_for_road = max_z_for_road
-
+        self.image_height = image_height
+        self.image_width = image_width
 
     def _get_road_top_and_bottom_v(self)->Tuple[float, float]:
-        _, road_transfrom = self._road_vector_to_road_width_and_transform(self.road_vector)
+        _, road_transfrom = self._road_vector_to_road_width_and_transform(self.estimated_road_vector)
         plane_y = road_transfrom.yc
         theta = math.atan(plane_y/self.max_z_for_road) 
         road_contour_top = int(theta*self.image_height/np.pi +self.image_height/2.)
@@ -105,6 +112,11 @@ class EquirectStereoRoadDetector(RoadDetector):
         road_vector = [road_width, xc,yc,yaw,pitch, roll]
         return road_vector
     
+    def set_road_vector_and_bounds(self, road_width:float, road_transform:Transform, minRoadWidth=3., maxRoadWidth=10., maxdX=2.,maxDy=0.3, maxPitch=20*np.pi/180, maxYaw=40*np.pi/180, maxRoll=20*np.pi/180 )->None:
+        self.estimated_road_vector = self._road_vector_from_road_width_and_transform(road_width, road_transform)
+        self.lower_bounds = np.array([minRoadWidth, road_transform.xc-maxdX, road_transform.yc-maxDy, road_transform.pitch-maxPitch, road_transform.yaw-maxYaw, road_transform.roll-maxRoll])
+        self.upper_bounds = np.array([maxRoadWidth, road_transform.xc+maxdX, road_transform.yc+maxDy, road_transform.pitch+maxPitch, road_transform.yaw+maxYaw, road_transform.roll+maxRoll])
+    
     def _get_road_contours_of_one_image(self, img: cvImage,prefix="") -> Sequence[np.ndarray]:
         '''
         Computes road contours from an input image.
@@ -116,7 +128,7 @@ class EquirectStereoRoadDetector(RoadDetector):
         - Sequence[np.ndarray]: A sequence of contour points.
         '''
         windowed = self.window.crop_image(img)
-        self.thresh_windowed = self.roadSegmentator.segment_road_image(windowed)
+        self.thresh_windowed = self.roadSegmentator.segment_road_image(windowed,prefix=prefix)
         if self.debug:
             cv2.imwrite(get_output_path(f'{self.frame_id}_{prefix}_windowed.png'), windowed)
             cv2.imwrite(get_output_path(f'{self.frame_id}_{prefix}_thresh_windowed.png'), self.thresh_windowed)
@@ -427,7 +439,7 @@ class EquirectStereoRoadDetector(RoadDetector):
 
         return residue
 
-    def _optimize_road_equation_and_rotation(self, 
+    def _optimize_road_vector(self, 
                             left_img_contour_left: np.ndarray, 
                             left_img_contour_right: np.ndarray, 
                             right_img_contour_left: np.ndarray, 
@@ -436,7 +448,7 @@ class EquirectStereoRoadDetector(RoadDetector):
                             initial_road_transform: Transform,
                             bounds: Tuple[np.ndarray, np.ndarray], 
                             img_width: int, 
-                            img_height: int) -> np.ndarray:
+                            img_height: int) -> Tuple[np.ndarray,float] :
         '''
         Optimizes the road plane equation (3 params) and plane transform (3 params : ty, pitch, roll).
         By comparing contours points projected to road plane to road equation in plane
@@ -455,10 +467,10 @@ class EquirectStereoRoadDetector(RoadDetector):
         Returns:
         - road_width: The optimized road width.
         - Transfrom : The optimized road transform
+        - cost: the remaining residual. Useful to assess the quality of optimization
         '''
         # Optimize the cam_rotation_vector using least_squares
         initial_params = self._road_vector_from_road_width_and_transform(road_width=initial_road_width,road_transform=initial_road_transform)
-        
         
         result = least_squares(
             fun=lambda road_params: self._compute_residuals(
@@ -472,11 +484,11 @@ class EquirectStereoRoadDetector(RoadDetector):
             bounds=bounds,
             method='trf'  # 'trf' method supports bounds
         )
-        self.road_vector   = result.x
+        self.estimated_road_vector = result.x
         # Return the optimized camera rotation vector
-        return self.road_vector
+        return self.estimated_road_vector, result.cost
     
-    def compute_road_width(self, img_left_right: cvImage) -> float:
+    def compute_road_width(self, img_left_right: cvImage) -> Tuple[float,float]:
         '''
         Computes the road width from an image.
 
@@ -485,16 +497,17 @@ class EquirectStereoRoadDetector(RoadDetector):
 
         Returns:
         - float: Estimated road width in meters.
+        - float: cost per point. The lower, the safer the optimization is fine
         '''
-
-        initial_road_width, initial_road_transform = self._road_vector_to_road_width_and_transform(self.road_vector)
+        not_found =(-1.,1.)
+        initial_road_width, initial_road_transform = self._road_vector_to_road_width_and_transform(self.estimated_road_vector)
         logger.info(f'{self.frame_id} Computing road width')
         height, dual_img_width = img_left_right.shape[:2]
         
         # Ensure the width is even so that it can be evenly split into two halves
         if dual_img_width % 2 != 0:
             logger.error(f'{self.frame_id} Image width {dual_img_width} is not even. Cannot split into two equal halves.')
-            return -1
+            return not_found
         # Split the image into left and right halves
         middle = dual_img_width // 2
         img_left = img_left_right[:, :middle]
@@ -504,32 +517,33 @@ class EquirectStereoRoadDetector(RoadDetector):
         start_segementation_time = time.time()
         logger.debug(f'{self.frame_id} testing left contours.')    
         self.left_img_contour_left, self.left_img_contour_right = self._get_left_right_contours_of_one_image(img_left,"left")
+       
+        #check if we found contours for left image
         if self.left_img_contour_left is not None and  self.left_img_contour_right is not None:
             logger.debug(f'{self.frame_id} testing right contours.')   
             self.right_img_contour_left, self.right_img_contour_right = self._get_left_right_contours_of_one_image(img_right,"right")
-        else :
+        else :#if not, stop here
             self.right_img_contour_left = self.right_img_contour_right = None
+        
         end_segmentation_time = time.time()
         logger.debug(f'{self.frame_id} Segmentation time: {round(end_segmentation_time - start_segementation_time,1)} seconds')
         if self.left_img_contour_left is None or self.left_img_contour_right is None or self.right_img_contour_left is None or self.right_img_contour_right is None:
-            return -1
+            return not_found
         
         self.left_img_contour_left = self.left_img_contour_left[self.left_img_contour_left[:, 1].argsort()]
         self.left_img_contour_right = self.left_img_contour_right[self.left_img_contour_right[:, 1].argsort()]
         self.right_img_contour_left = self.right_img_contour_left[self.right_img_contour_left[:, 1].argsort()]
         self.right_img_contour_right = self.right_img_contour_right[self.right_img_contour_right[:, 1].argsort()]
 
-        # Project on the road plane and optimize camera rotation
-        
+        # Project on the road plane and optimize road vector
         bounds = (self.lower_bounds, self.upper_bounds)
         
-
         #we must ensure to have roughly same nb points for left and right camera => better optimization
         min_nb_points = min(20,len(self.left_img_contour_left), len(self.left_img_contour_right), len(self.right_img_contour_left), len(self.right_img_contour_right))
         
         if min_nb_points<5:
             logger.error(f'{self.frame_id} Not enough points to compute road width, min_nb_points is {min_nb_points}')
-            return -1
+            return not_found
 
         arrays = [self.left_img_contour_left,self.left_img_contour_right,self.right_img_contour_left,self.right_img_contour_right]
         returned_arrays = []
@@ -538,16 +552,18 @@ class EquirectStereoRoadDetector(RoadDetector):
             returned_arrays.append(np.array([a[i] for i in indices]))
         left_img_contour_left,left_img_contour_right,right_img_contour_left,right_img_contour_right = returned_arrays
         
-        optimized_road_vector = self._optimize_road_equation_and_rotation(
+        optimized_road_vector, cost = self._optimize_road_vector(
             left_img_contour_left, left_img_contour_right, 
             right_img_contour_left, right_img_contour_right, 
             initial_road_width=initial_road_width,
             initial_road_transform=initial_road_transform,
             bounds=bounds, img_width=img_width, img_height=img_height)
-
-        logger.debug(f'{self.frame_id} optimized_road_vector {optimized_road_vector}')
+        
+        nb_points = len(left_img_contour_left)+len(left_img_contour_right)+len(right_img_contour_left)+len(right_img_contour_right)
+        cost = cost/nb_points
+        logger.debug(f'{self.frame_id} optimized_road_vector {optimized_road_vector} width cost per point {cost}')
         optimized_road_width, optimized_road_transform = self._road_vector_to_road_width_and_transform(optimized_road_vector)
-        self.road_vector = optimized_road_vector
+        
         if self.debug:
             # Debug and display road points
             self._debug_display_road_points2D(left_img_contour_left, left_img_contour_right, 
@@ -555,6 +571,6 @@ class EquirectStereoRoadDetector(RoadDetector):
                                               optimized_road_vector, 
                                               img_width, img_height)
 
-        
-        return optimized_road_width
+        self.optimized_road_vector = optimized_road_vector
+        return optimized_road_width, cost
 
