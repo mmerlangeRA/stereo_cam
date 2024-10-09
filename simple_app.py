@@ -4,7 +4,7 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
-from src.road_detection.equirect_mono_road_detector import EquirectMonoRoadDetector
+from src.road_detection.equirect_mono_road_detector import EquirectMonoRoadDetector, Transform
 from src.road_detection.RoadSegmentator import PIDNetRoadSegmentator, RoadSegmentator, SegFormerRoadSegmentator
 from src.road_detection.common import AttentionWindow
 import time
@@ -20,14 +20,14 @@ st.title("Test détection et dimensionnement")
 
 # Paramètres
 uploaded_file = st.file_uploader("Choisir une image...", type=["jpg", "jpeg", "png"])
-cam_height_slider = st.slider("hauteur caméra", 1.5, 2.2, 1.65, 0.01)
-max_width_slider = st.slider("max_width", 0, 2048, 2048,128)
+cam_height_slider = st.slider("hauteur caméra", 1.5, 2.2, 1.85, 0.01)
+max_width_slider = st.slider("max_width", 0, 5376, 5376,2688)
 limit_left_slider = st.slider("left", 0.0, 1.0, 0.4)
 limit_right_slider = st.slider("right", 0.0, 1.0, 0.6)
-limit_top_slider = st.slider("top", 0.0, 1.0, 0.3)
+limit_top_slider = st.slider("top", 0.0, 1.0, 0.4)
 limit_bottom_slider = st.slider("bottom", 0.0, 1.0, 0.6)
 kernel_slider = st.slider("kernel", 1, 50, 20,1)
-degree_slider = st.slider("degree", 1, 3, 2,1)
+degree_slider = st.slider("degree", 1, 3, 1,1)
 use_seg = st.checkbox("nvidia",value=True)
 
 use_1024 = st.checkbox("use_1024", value=False, disabled=not use_seg)
@@ -72,19 +72,20 @@ if uploaded_file is not None:
     former_seg = use_seg
     former_use_1024=use_1024
 
-    roadDetector = EquirectMonoRoadDetector(roadSegmentator=roadSegmentator,window=window,road_down_y=cam_height_slider, degree=degree_slider, debug=is_debug)
-    average_width, optimized_transform = roadDetector.compute_road_width(img)
+    roadDetector = EquirectMonoRoadDetector(roadSegmentator=roadSegmentator,window=window, degree=degree_slider, debug=is_debug)
+    roadDetector.set_road_vector_and_bounds(road_width=6.,road_transform=Transform(0.,cam_height_slider,0.,0.,0.,0.))
+    optimized_width, optimized_transform = roadDetector.compute_road_width(img)
     first_poly_model=roadDetector.left_poly_model
     second_poly_model=roadDetector.right_poly_model
-    contour_left = roadDetector.contour_left
-    contour_right = roadDetector.contour_right
+    contour_left = roadDetector.left_img_contour_left
+    contour_right = roadDetector.left_img_contour_right
     contour_points = np.concatenate((contour_left, contour_right), axis=0)
     x= contour_points[:, 0]
     y = contour_points[:, 1]
 
     end_time = time.time()
     st.write("Temps calcul (s)",round(end_time-start_time,2))
-    st.write("Estimation (m)",round(average_width,2))
+    st.write("Estimation (m)",round(optimized_width,2))
 
     # Debug image
 
