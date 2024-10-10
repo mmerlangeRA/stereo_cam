@@ -18,23 +18,23 @@ from src.road_detection.StereoEquirectStereoDetector import EquirectStereoRoadDe
 
 
 frames =[
-            {
-        "frame_id": 0,
-        "imgLeft" :r"C:\Users\mmerl\projects\stereo_cam\data\Photos\P3\D_P3_CAM_G_0_EAC.png",
-        "imgRight":r"C:\Users\mmerl\projects\stereo_cam\data\Photos\P3\D_P3_CAM_D_0_EAC.png",
-        "keypoints_camL": [ 
-             [3034, 1258],
-            [3100.0, 1258.0],
-            [3100.0,1328.0],
-            [3034.0, 1329.0]
-        ],
-        "keypoints_camR": [
-             [2851, 1268],
-             [2926.0,1265.0],
-             [2926.0, 1343.0],
-             [2853, 1342]
-        ]
-    },
+    #         {
+    #     "frame_id": 0,
+    #     "imgLeft" :r"C:\Users\mmerl\projects\stereo_cam\data\Photos\P3\D_P3_CAM_G_0_EAC.png",
+    #     "imgRight":r"C:\Users\mmerl\projects\stereo_cam\data\Photos\P3\D_P3_CAM_D_0_EAC.png",
+    #     "keypoints_camL": [ 
+    #          [3034, 1258],
+    #         [3100.0, 1258.0],
+    #         [3100.0,1328.0],
+    #         [3034.0, 1329.0]
+    #     ],
+    #     "keypoints_camR": [
+    #          [2851, 1268],
+    #          [2926.0,1265.0],
+    #          [2926.0, 1343.0],
+    #          [2853, 1342]
+    #     ]
+    # },
         {
         "frame_id": 1,
         "imgLeft" :r"C:\Users\mmerl\projects\stereo_cam\data\Photos\P5\D_P5_CAM_G_2_EAC.png",
@@ -200,7 +200,7 @@ roadDetector = EquirectStereoRoadDetector(roadSegmentator=roadSegmentator,
                                           degree=polynomial_degree, 
                                           camRight_transform=best_camRight_transform_estimation,
                                         debug=road_debug)
-roadDetector.set_road_vector_and_bounds(road_width=6., road_transform=Transform(0.,camHeight,0.,0.,0.,0.),maxDy=0.01)
+roadDetector.set_road_vector_and_bounds(road_width=6., road_transform=Transform(0.,camHeight,0.,0.,0.,0.),maxDy=0.41)
 
 initialization_end_time = time.time()
 print("Time taken for initialization: ", round(initialization_end_time - initialization_start_time,1), "seconds")
@@ -309,3 +309,42 @@ with open(save_path, 'w', newline='', encoding='utf-8') as csvfile:
 
 
 
+'''
+no bounds
+5m
+[ 5.16421063 -0.0186922   1.43853104  0.08434241 -0.02065729  0.05813891] 
+width cost per point 0.061459115940396505
+
+6m
+ 6.04930268 -0.04176894  1.74275409  0.09025078 -0.01509992  0.07686831] 
+ width cost per point 0.009340636216534403
+
+ bounds
+ 5m
+ [ 5.88914350e+00 -9.59210940e-02  1.89588431e+00  1.00060662e-01
+  2.31399303e-03  9.45346585e-02] width cost per point 0.05134936898971783
+
+  [ 5.96565486e+00 -1.45689749e-01  1.89526404e+00  9.51554744e-02
+  7.27849183e-04  7.94727468e-02] width cost per point 0.04584568965651571
+road_width 5.965654859279271 in 5.3
+
+bounds
+[ 3.        , -2.        ,  1.89      , -0.34906585, -0.6981317 ,
+       -0.34906585]), 
+[10.        ,  2.        ,  1.91      ,  0.34906585,  0.6981317 ,
+        0.34906585]
+
+        
+ [ 6.30491894 -0.12625485  1.89754464  0.0871086  -0.00679621  0.07009823] width cost per point 0.03142423896450986
+[ 6.21351160e+00 -1.08638739e-01  1.89739679e+00  7.42626869e-02
+ -3.95171870e-05  8.93230217e-02] width cost per point 0.11850896354431832
+
+5m, big 
+ (array([ 3.        , -2.        ,  1.89      , -0.34906585, -0.6981317 ,
+       -0.34906585]), array([10.        ,  2.        ,  1.91      ,  0.34906585,  0.6981317 ,
+        0.34906585]))
+[ 5.79312039 -0.08445456  1.89524715  0.08368679  0.01135582  0.11649639] width cost per point 0.22315652805942146        
+road_width 5.793120394298877 in 8.9
+
+[ 5.71031252 -0.04766895  1.81686901  0.08283233  0.00609542  0.11279379] width cost per point 0.11973435866491423
+'''

@@ -406,7 +406,7 @@ class EquirectMonoRoadDetector(RoadDetector):
         bounds = (self.lower_bounds, self.upper_bounds)
         
         #we must ensure to have roughly same nb points for left and right camera => better optimization
-        min_nb_points = min(20,len(self.left_img_contour_left), len(self.left_img_contour_right))
+        min_nb_points = min(100,len(self.left_img_contour_left), len(self.left_img_contour_right))
         
         if min_nb_points<5:
             logger.error(f'{self.frame_id} Not enough points to compute road width, min_nb_points is {min_nb_points}')

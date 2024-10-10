@@ -147,23 +147,6 @@ def triangulate_point_from_rays(v1:Union[np.ndarray, np.array], v2:Union[np.ndar
         raise ValueError("v1 must be a vector or an array of vectors")
 
 
-
-def get_3d_point_cam1_2_from_coordinates_old(keypoints_cam1: Tuple[float, float], keypoints_cam2: Tuple[float, float], image_width: int, image_height: int, R: np.ndarray, t: np.ndarray, verbose: bool=False) -> Tuple[np.ndarray, np.ndarray, float]:
-    """Get 3D points from camera coordinates."""
-    point_image1 = np.array(keypoints_cam1)
-    point_image2 = np.array(keypoints_cam2)
-
-    theta1, phi1 = pixel_to_spherical(image_width, image_height, point_image1[0], point_image1[1])
-    theta2, phi2 = pixel_to_spherical(image_width, image_height, point_image2[0], point_image2[1])
-
-    ray1 = spherical_to_cartesian(theta1, phi1)
-    ray2 = spherical_to_cartesian(theta2, phi2)
-    point_3d_cam1, point_3d_cam2, residual_distance_in_m = triangulate_point_from_rays(ray1, ray2, t, R, verbose=verbose)
-    return point_3d_cam1, point_3d_cam2, residual_distance_in_m
-
-import numpy as np
-from typing import Union, Tuple
-
 def get_3d_point_cam1_2_from_coordinates(
     keypoints_cam1: Union[Tuple[float, float], np.ndarray],
     keypoints_cam2: Union[Tuple[float, float], np.ndarray],

@@ -370,9 +370,8 @@ class EquirectStereoRoadDetector(RoadDetector):
         Plane_origin_world = np.array([road_plane_transform_world.xc,road_plane_transform_world.yc,road_plane_transform_world.zc])
         #compute plane transform in camRight referential
         camRightRotationInversed =camRightTransform.inverseRotationMatrix
-        camRightTransflationInversed = -camRightTransform.translationVector
 
-        road_plane_transform_camRight_origin = camRightRotationInversed @ Plane_origin_world + camRightTransflationInversed
+        road_plane_transform_camRight_origin = camRightRotationInversed @ (Plane_origin_world + -camRightTransform.translationVector)
         road_plane_transform_camRight_rotation = camRightRotationInversed @ road_plane_transform_world.rotationMatrix
         
         xc,yc,zc = road_plane_transform_camRight_origin
@@ -407,7 +406,6 @@ class EquirectStereoRoadDetector(RoadDetector):
         '''
         road_width, road_plane_transform_world = self._road_vector_to_road_width_and_transform(road_params)
 
-        
         road_plane_transform_camRight = self._compute_road_plane_in_camRight_ref(camRightTransform, road_plane_transform_world)
         
         left_road_points_left, left_road_points_right = self._compute_left_right_road_points2D(
@@ -420,7 +418,6 @@ class EquirectStereoRoadDetector(RoadDetector):
         all_points  = np.concatenate((left_road_points_left, left_road_points_right, right_road_points_left, right_road_points_right), axis=0)
     
         x_p = all_points[:, 0]
-        z = all_points[:, 1]
 
         half_road_width = road_width / 2
         # Compute x positions of the left and right lines
@@ -436,7 +433,7 @@ class EquirectStereoRoadDetector(RoadDetector):
 
         # Sum up the residuals
         residue = np.sum(min_diffs)
-
+        #print(residue)
         return residue
 
     def _optimize_road_vector(self, 
@@ -484,6 +481,8 @@ class EquirectStereoRoadDetector(RoadDetector):
             bounds=bounds,
             method='trf'  # 'trf' method supports bounds
         )
+        if self.debug:
+            print(bounds)
         self.estimated_road_vector = result.x
         # Return the optimized camera rotation vector
         return self.estimated_road_vector, result.cost
@@ -537,18 +536,18 @@ class EquirectStereoRoadDetector(RoadDetector):
 
         # Project on the road plane and optimize road vector
         bounds = (self.lower_bounds, self.upper_bounds)
-        
+        min_nb_points = 100
         #we must ensure to have roughly same nb points for left and right camera => better optimization
-        min_nb_points = min(20,len(self.left_img_contour_left), len(self.left_img_contour_right), len(self.right_img_contour_left), len(self.right_img_contour_right))
+        computed_min_nb_points = min(min_nb_points,len(self.left_img_contour_left), len(self.left_img_contour_right), len(self.right_img_contour_left), len(self.right_img_contour_right))
         
-        if min_nb_points<5:
-            logger.error(f'{self.frame_id} Not enough points to compute road width, min_nb_points is {min_nb_points}')
+        if computed_min_nb_points<20:
+            logger.error(f'{self.frame_id} Not enough points to compute road width, min_nb_points is {computed_min_nb_points} expected {min_nb_points}')
             return not_found
 
         arrays = [self.left_img_contour_left,self.left_img_contour_right,self.right_img_contour_left,self.right_img_contour_right]
         returned_arrays = []
         for a in arrays:
-            indices = random.sample(range(len(a)), min_nb_points)
+            indices = random.sample(range(len(a)), computed_min_nb_points)
             returned_arrays.append(np.array([a[i] for i in indices]))
         left_img_contour_left,left_img_contour_right,right_img_contour_left,right_img_contour_right = returned_arrays
         

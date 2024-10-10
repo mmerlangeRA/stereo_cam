@@ -4,7 +4,6 @@ import numpy.typing as npt
 import cv2
 from scipy.spatial.transform import Rotation as R
 
-from src.utils.intersection_utils import compute_intersection_rays_plane, compute_plane_coordinates, get_plane_P0_and_N_from_transform
 from src.utils.TransformClass import Transform
 import numpy as N
 
@@ -222,10 +221,10 @@ def get_extrinsic_matrix_from_rvec_tvec(rvec:np.array, tvec:np.array)->np.array:
 def transform_origin_rays_to_new_ref(rays_world:np.ndarray, ref_transform:Transform):
     # Ray origins in plane coordinates
     world_to_ref_rotation_matrix = ref_transform.inverseRotationMatrix
-    world_to_ref_translation = -ref_transform.translationVector
-    #ray_origin_world = np.zeros(3)
-    #new_rays_origin = world_to_ref_rotation_matrix @ (ray_origin_world + world_to_ref_translation)
-    new_rays_origin = world_to_ref_translation
+    #world_to_ref_translation = -ref_transform.translationVector
+    ray_origin_world = np.zeros(3)
+    new_rays_origin = world_to_ref_rotation_matrix @ (ray_origin_world -ref_transform.translationVector)
+    #new_rays_origin = world_to_ref_translation
     
     # Ray directions in plane coordinates
     new_rays = (world_to_ref_rotation_matrix @ rays_world.T).T
@@ -250,7 +249,6 @@ def equirect_to_road_plane_points2D(imgWidth:int, imgHeight:int,plane_transform:
     # We assume world is the camera referential and we want projection on road plane
     theta, phi = pixel_to_spherical (imgWidth, imgHeight,contour_x, contour_y)
     world_ray = spherical_to_cartesian(theta, phi)
-    #P0,N=get_plane_P0_and_N_from_transform(plane_transform=plane_transform)
     plane_coords=compute_world_rays_intersections_in_plane_referential2D(world_ray,plane_transform)
 
     #test_plane_coords = equirect_to_road_plane_points2D_old(imgWidth, imgHeight, plane_transform, contour_x, contour_y)

@@ -123,7 +123,7 @@ data=[
 
 
 #initial params and bounds
-baseline = 1.12
+baseline = 1.125
 angle_max = np.pi*10./180.
 dt_max_y = 0.12001
 dt_max_z= 0.12001
@@ -138,7 +138,7 @@ def generate_all_calibrations(initialTransform:Transform,transformBounds:Transfo
     array_calibration = {}
     
     for photo in range(0,6):
-        for angle in range(2, 3):
+        for angle in range(0, 3):
             img_folder = os.path.join(photo_folder_path, 'P'+str(photo))
             left_image_path = 'D_P'+str(photo)+'_CAM_G_'+str(angle)+'_EAC.png'
             right_image_path = 'D_P'+str(photo)+'_CAM_D_'+str(angle)+'_EAC.png'
@@ -170,7 +170,7 @@ def generate_all_calibrations(initialTransform:Transform,transformBounds:Transfo
         writer.writeheader()
         writer.writerows(csv_data)
 
-#generate_all_calibrations(estimatedTransform,bnds,0.01,"01")                                                             
+generate_all_calibrations(estimatedTransform,bnds,0.01,"01")                                                             
 
 data_5_2=[{#P5_2
             "id":"5_2",
