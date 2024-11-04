@@ -163,7 +163,6 @@ dependencies:
   - typing-extensions=4.11.0=py311haa95532_0
   - typing_extensions=4.11.0=py311haa95532_0
   - tzdata=2024a=h04d1e81_0
-  - ultralytics=8.2.42=pyh1669911_0
   - unicodedata2=15.1.0=py311h2bbff1b_0
   - urllib3=2.2.1=py311haa95532_0
   - uvicorn=0.20.0=py311haa95532_0
@@ -193,6 +192,7 @@ dependencies:
       - dash-html-components==2.0.0
       - dash-table==5.0.0
       - decorator==5.1.1
+      - dill==0.3.9
       - efficientnet==1.1.1
       - efficientnet-pytorch==0.7.1
       - einops==0.8.0
@@ -279,6 +279,7 @@ dependencies:
       - tornado==6.4
       - traitlets==5.14.3
       - transformers==4.41.2
+      - ultralytics==8.3.2
       - ultralytics-thop==2.0.0
       - watchdog==4.0.1
       - wcwidth==0.2.13
