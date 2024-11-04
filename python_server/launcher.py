@@ -1,19 +1,17 @@
 """FastAPI app creation, logger configuration and main API routes."""
 import logging
 import os
-
+from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from injector import Injector
+
 from python_server.components.triangulation_equipolar.database.main import init_db
 from python_server.routes.segmentation.segmentation_router import segmentation_router 
 from python_server.routes.triangulation_equipolar.triangulation_router import triangulation_router 
 from python_server.routes.photo_router.photo_router import photo_router 
-
 from python_server.settings.settings import Settings
-from fastapi.staticfiles import StaticFiles
-from contextlib import asynccontextmanager
-
 from python_server.utils.path_helper import create_static_folder
 
 logger = logging.getLogger(__name__)

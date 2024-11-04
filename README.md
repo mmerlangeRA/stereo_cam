@@ -42,6 +42,12 @@ source venv/bin/activate
 
 ## Utilisation scripts
 
+### Calibration Chessboard
+
+```bash
+python scripts/mono_calibrate_undistort_rectifiy.py
+```
+
 ### Autocalibration EAC
 
 ```bash
@@ -66,14 +72,14 @@ Il est supposé que toutes les photos sont dans le dossier Photos, à la racine.
 J'ai utilisé une copie de <https://drive.google.com/drive/folders/1DFFxjpu4VPXhJ9-PGA0izL2VoJxEwOxL?usp=sharing>
 
 ```bash
-python triangulate_test.py
+python scripts/triangulate_test.py
 
 ```
 
 ### Depth estimation
 
 ```bash
-python stereo_depth.py --restore_ckpt pretrained_models\middlebury_finetune.pth --valid_iters 180 --max_disp 768 --left_img C:\Users\mmerl\projects\stereo_cam\static\photos\13_rectified_left.jpg --right_img C:\Users\mmerl\projects\stereo_cam\static\photos\13_rectified_right.jpg  --output_directory output
+python scripts/stereo_depth.py --restore_ckpt pretrained_models\middlebury_finetune.pth --valid_iters 180 --max_disp 768 --left_img C:\Users\mmerl\projects\stereo_cam\static\photos\13_rectified_left.jpg --right_img C:\Users\mmerl\projects\stereo_cam\static\photos\13_rectified_right.jpg  --output_directory output
 ```
 
 ### Road segmentation
@@ -81,7 +87,7 @@ python stereo_depth.py --restore_ckpt pretrained_models\middlebury_finetune.pth 
 Stereo, standard
 
 ```bash
-python scripts/road_detection_stereo.py --img_left_path C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\11_rectified_left.jpg --img_right_path C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\11_rectified_right.jpg --calibration_path C:\Users\mmerl\projects\stereo_cam\calibration\calibrator_matrix.json
+python scripts/road_detection_stereo.py --img_left_path C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\11_rectified_left.jpg --img_right_path C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE\11_rectified_right.jpg --calibration_path C:\Users\mmerl\projects\stereo_cam\calibration\calibrator_matrix.json --debug True
 ```
 
 python scripts/road_detection_stereo.py --img_left_path C:\Users\mmerl\projects\stereo_cam\static\gauche.png --img_right_path C:\Users\mmerl\projects\stereo_cam\static\droite.png --calibration_path C:\Users\mmerl\projects\stereo_cam\calibration\calibrator_matrix.json
@@ -90,7 +96,7 @@ python scripts/road_detection_stereo.py --img_left_path C:\Users\mmerl\projects\
 EAC
 
 ```bash
-python scripts/road_detection_eac.py --img_path C:\Users\mmerl\projects\stereo_cam\Photos\P5\D_P5_CAM_G_0_EAC.png 
+python scripts/road_detection_eac.py --img_path C:\Users\mmerl\projects\stereo_cam\Photos\test\image_R_65_20240730_143124_315000_2591.jpg --debug True
 ```
 
 ## Lancement du serveur sur le port 8001
@@ -138,3 +144,10 @@ python -m unittest discover -s tests
 ## Docker installation
 
 to be done
+
+courbe P2 (a,b) avec largeur d dans plan y=0. transformée par EAC (rot, height) 
+
+on prend points, on cherche a,b,d, rot, height pour minimiser 
+
+fonction qui prend x,y dans plan 0 et donnent coordonnée dans EAC
+=> dans ref cam puis rayons, puis position EAC

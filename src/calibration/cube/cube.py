@@ -9,11 +9,11 @@ from src.utils.cube_image import get_cube_front_image, get_cube_sub_images
 
 calibration_folder = "calibration"
 
-def save_calibration_params(params, filename:str)->None:
-    np.savetxt(filename+'.csv', params, delimiter=',')
+def save_calibration_params(params, filepath:str)->None:
+    np.savetxt(filepath, params, delimiter=',')
 
-def load_calibration_params(filename:str)->np.ndarray[float]:
-    loaded =np.loadtxt(filename+'.csv', delimiter=',')
+def load_calibration_params(filepath:str)->np.ndarray[float]:
+    loaded =np.loadtxt(filepath, delimiter=',')
     return loaded
 
 def save_calibration(mtx, dist, rmse,fname="calibration_matrix.yaml")->None:
@@ -29,7 +29,7 @@ def read_calibration(fname="calibration_matrix.yaml")->np.ndarray[float]:
     return np.asarray(data['camera_matrix']), np.asarray(data['dist_coeff']),data['rmse']
 
 
-def compute_cube_calibration(image_paths:List[str],chessboard_size:cv2.typing.Size,square_size:float, use_only_front=False,verbose=False)->tuple[cv2.typing.MatLike, cv2.typing.MatLike,float]:
+def compute_cube_calibration(image_paths:List[str],chessboard_size:cv2.typing.Size,square_size:float, use_only_front=True,verbose=False)->tuple[cv2.typing.MatLike, cv2.typing.MatLike,float]:
     """
     Calibrates a camera using images of a chessboard pattern extracted from cube images.
 
@@ -50,8 +50,12 @@ def compute_cube_calibration(image_paths:List[str],chessboard_size:cv2.typing.Si
     imgpoints=[]
     rows, cols = chessboard_size
     objp = np.zeros((rows * cols, 3), np.float32)
-    objp[:, :2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2)
+    objp[:, :2] = np.mgrid[0:rows, 0:cols].T.reshape(-1, 2)
     objp *= square_size
+
+    # objp2 = np.zeros((6*9,3), np.float32)
+    # objp2[:,:2] = np.mgrid[0:9,0:6].T.reshape(-1,2)
+    # objp2 *= square_size 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
     window_size = (11, 11)

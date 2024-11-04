@@ -2,7 +2,7 @@ import cv2
 import os
 from bootstrap import set_paths
 set_paths()
-from src.calibration.StereoCalibrator import StereoCalibrator
+from src.calibration.cube.StereoCalibrator import StereoCalibrator
 from src.utils.path_utils import find_images_paths_in_folder, load_and_preprocess_cube_front_images
 
 # Chessboard' size = nb of inner corners
@@ -11,6 +11,8 @@ chessboard_size = (9,6)
 square_size = 0.025
 
 stereo_calibrator = StereoCalibrator(verbose=True, estimated_base_line_in_m=1.12,calibration_file_name="calibrator_matrix.json")
+
+#empty the calibration to recompute it all
 stereo_calibrator.reset()
 
 #Path to calibration matrix
@@ -20,7 +22,7 @@ stereo_images_folder= r'C:\Users\mmerl\projects\stereo_cam\Photos'
 
 folder_name = "undistorted_CUBE"
 folder_path_for_undistorted = os.path.join(os.getcwd(),folder_name)
-folder_path_for_undistorted= r"C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE"
+#folder_path_for_undistorted= r"C:\Users\mmerl\projects\stereo_cam\undistorted_CUBE"
 
 if not os.path.exists(folder_path_for_undistorted):
     os.makedirs(folder_path_for_undistorted)
@@ -53,8 +55,9 @@ right_img_paths = []
 for i in range(nb_pairs):
     leftImg = front_images[2*i]
     rightImg = front_images[2*i+1]
-
+    
     undistorted_left,newcameramtx = stereo_calibrator.undistort_and_crop(leftImg)
+    print(leftImg.shape)
     undistorted_right,newcameramtx = stereo_calibrator.undistort_and_crop(rightImg)
     undistorted_left_path = os.path.join(folder_path_for_undistorted, f'{i}_left.png')
     undistorted_right_path = os.path.join(folder_path_for_undistorted, f'{i}_right.png')

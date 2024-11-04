@@ -3,16 +3,14 @@ import json
 import os
 from typing import List, Tuple
 import cv2
-from matplotlib import pyplot as plt
 import numpy as np
 from src.features_2d.utils import detectAndComputeKPandDescriptors
 from scipy.optimize import least_squares
 
-from src.calibration.cube import compute_cube_calibration, undistort_and_crop
-from src.calibration.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
+from src.calibration.cube.cube import compute_cube_calibration, undistort_and_crop, undistort_image
+from src.calibration.cube.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
 from src.utils.cube_image import get_cube_front_image
-from src.utils.path_utils import get_calibration_folder_path, get_static_folder_path
-from src.utils.coordinate_transforms import get_extrinsic_matrix_from_rvec_tvec, get_identity_extrinsic_matrix, get_transformation_matrix, invert_rvec_tvec
+from src.utils.path_utils import get_calibration_folder_path, get_output_path
 
 @dataclass
 class StereoFullCalibration:
@@ -51,6 +49,8 @@ class StereoFullCalibration:
 
     def from_json(json_str):
         d = json.loads(json_str)
+        d['mono_K'] = np.asarray(d['mono_K'])
+        d['mono_dist'] = np.asarray(d['mono_dist'])
         return StereoFullCalibration(**d)
 
 def compute_reprojection_residual(params:List[float],pts1, pts2, dist_coeffs:List[float])->float:
@@ -135,19 +135,21 @@ class StereoCalibrator:
 
         self.calibration = StereoFullCalibration.from_json (open(self.calibration_file_path, 'r').read())
         if(len(self.calibration.stereo_rectified_tvec)>0):
-            self.estimated_base_line_in_m = -self.calibration.stereo_rectified_tvec[0][0]
+            self.estimated_base_line_in_m = self.calibration.stereo_rectified_tvec[0]
 
-    def compute_mono_chessboard_calibration(self, image_paths:List[str],chessboard_size:cv2.typing.Size,square_size:float)->tuple[float,cv2.typing.MatLike, cv2.typing.MatLike]:
+    def compute_mono_chessboard_calibration(self, image_paths:List[str],chessboard_size:cv2.typing.Size,square_size:float,use_only_front=False)->tuple[float,cv2.typing.MatLike, cv2.typing.MatLike]:
         """
         Compute calibration for monocular chessboard images.
         """
-        self.calibration.mono_K, self.calibration.mono_dist,self.calibration.mono_ret = compute_cube_calibration(image_paths=image_paths, chessboard_size=chessboard_size, square_size=square_size, verbose=self.verbose)
+        self.calibration.mono_K, self.calibration.mono_dist,self.calibration.mono_ret = compute_cube_calibration(image_paths=image_paths, chessboard_size=chessboard_size, square_size=square_size, verbose=self.verbose,use_only_front=use_only_front)
+       
         img = cv2.imread(image_paths[0])
         front_image=get_cube_front_image(img)
         height, width = front_image.shape[:2]
         self.calibration.mono_img_width=width
         self.calibration.mono_img_height=height
         return self.calibration.mono_K, self.calibration.mono_dist,self.calibration.mono_ret
+    
     
     def compute_stereo_chessboard_calibration(self, image_paths_left: List[str], image_paths_right: List[str], chessboard_size:cv2.typing.Size, square_size:float)->None:
         """
@@ -194,8 +196,12 @@ class StereoCalibrator:
 
     
     def undistort_and_crop(self,leftImg)-> tuple[cv2.typing.MatLike,cv2.typing.MatLike]:
-        undistorted_left,newcameramtx = undistort_and_crop(leftImg, self.calibration.mono_K, self.calibration.mono_dist)
+        undistorted_left,newcameramtx = undistort_and_crop(leftImg,self.calibration.mono_K, self.calibration.mono_dist)
         return undistorted_left,newcameramtx
+    
+    def undistort(self,leftImg)-> tuple[cv2.typing.MatLike,cv2.typing.MatLike]:
+        undistorted_left = undistort_image(leftImg,self.calibration.mono_K, self.calibration.mono_dist)
+        return undistorted_left
     
     def compute_global_auto_calibration(self,image_paths_left: List[str], 
                                         image_paths_right: List[str]) -> Tuple[np.ndarray, float, np.ndarray, np.ndarray]:
@@ -250,7 +256,7 @@ class StereoCalibrator:
             if self.verbose:
                 # Draw matches
                 img_matches = cv2.drawMatches(imgLeft, keypoints_list[0], imgRight, keypoints_list[1], matches[:50], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-                save_path = get_static_folder_path(f'img_matches_{i}.png')
+                save_path= get_output_path(f'img_matches_{i}.png')
                 cv2.imwrite(save_path, img_matches)
 
             # Extract matched keypoints
@@ -322,7 +328,8 @@ class StereoCalibrator:
                 print(f"Final Reprojection Error Cost: {result.cost/len(all_pts1):.6f}")
                 print(f"Optimality{result.optimality}")
 
-            
+            refined_tvec=refined_tvec.ravel()
+            refined_tvec*=self.estimated_base_line_in_m/refined_tvec[0]
             return K, float(result.cost/len(all_pts1)), refined_rvec, refined_tvec
     
     def compute_global_auto_calibration_undistorted(self,image_paths_left: List[str], 
@@ -348,12 +355,11 @@ class StereoCalibrator:
         self.compute_stereo_rectified_Z0()
         return  K, cost, refined_rvec, refined_tvec
         
-    def compute_stereo_rectified_Z0(self):
+    def compute_stereo_rectified_Z0(self)->None:
         rvec_inv, tvec_inv = invert_rvec_tvec(self.calibration.stereo_rectified_rvec, self.calibration.stereo_rectified_tvec)
         half_rot_y = rvec_inv[1][0]/2.
         half_baseline = self.estimated_base_line_in_m/2.
         self.calibration.stereo_rectified_Z0 = half_baseline * np.tan(np.pi/2.-half_rot_y)
-        print(type(self.calibration.stereo_rectified_Z0))
     
     def compute_auto_calibration_for_2_stereo_standard_images(self,imgLeft:cv2.typing.MatLike, imgRight:cv2.typing.MatLike,verbose=True)-> Tuple[np.ndarray, float, np.ndarray, np.ndarray]:
        
@@ -408,8 +414,8 @@ class StereoCalibrator:
 
         dst11 = cv2.warpPerspective(dst1,rectmat1,size)
         dst22 = cv2.warpPerspective(dst2,rectmat2,size)
-        cv2.imwrite(get_static_folder_path("gauche.png"), dst11)
-        cv2.imwrite(get_static_folder_path("droite.png"), dst22)
+        cv2.imwrite(get_output_path("gauche.png"), dst11)
+        cv2.imwrite(get_output_path("droite.png"), dst22)
 
 
         #calculation of the disparity

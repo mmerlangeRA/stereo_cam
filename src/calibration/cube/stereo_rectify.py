@@ -1,7 +1,7 @@
 from typing import Tuple
 import numpy as np
 import cv2
-from src.calibration.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
+from src.calibration.cube.stereo_standard_refinement import compute_auto_calibration_for_2_stereo_standard_images
 
 
 def rectify_images(img1,img2,K:np.ndarray | None =None)->Tuple[cv2.typing.MatLike,cv2.typing.MatLike]:
