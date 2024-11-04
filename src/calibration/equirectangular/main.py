@@ -132,7 +132,7 @@ def auto_compute_cam2_transform(imLeft:cv2.Mat, imRight:cv2.Mat, estimatedTransf
     #num_elements = int(len(matched1)*0.5)
     num_elements = 3
     max_iter = 500
-    prob = 0.95
+    prob = 0.99
     start = time.time()
 
     kpts1, desc1 = detectorManager.detectAndComputeKPandDescriptors(imLeft,attentionWindow=attention_window)
