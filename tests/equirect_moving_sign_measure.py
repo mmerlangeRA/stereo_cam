@@ -8,7 +8,6 @@ from src.calibration.equirectangular.main import auto_compute_cam2_transform, ge
 from src.triangulate.main import get_3d_point_cam1_2_from_coordinates
 from src.utils.TransformClass import Transform, TransformBounds
 
-
 frames =[
         {
         "frame_id": 1,
@@ -133,24 +132,37 @@ frames =[
     },
 ]
 
+def get_2_cam_refpoints(points):
+    points = np.array(points)
+    top = (points[0]+points[1])/2.
+    bottom = (points[2]+points[3])/2.
+    return points[0], points[3]
+
 #frames=[frames[1]]
 
+# Assumptions
+## Image size
 image_width =5376 
 image_height= 2688 
 
 invert_left_right = True
 
-optimize_global= True
-inlier_threshold = 0.001
+should_optimize_global= True
+inlier_threshold = 0.005
+
+## Cameras geometry
 base_line=1.125
-angle_max = np.pi*5./180.
-dt_max_y = 0.05
-dt_max_z= 0.7
+angle_max = np.pi*5./180.# max error on rotation
+dt_max_y = 0.05# max error on y translation 
+dt_max_z= 0.7# max error on z translation 
 default_transform = Transform(base_line, 0., 0., 0., 0., 0.)
 best_results = Transform(base_line,0.,0.,0.,0.,0.)
+
+#Give best estimation, should be updated at every frame
 estimated_transform = Transform(xc=1.1100000000010084, yc=-0.015367638222386357, zc=0.026834207520040555, pitch=0.023162473327744338, yaw=0.07609111219036904, roll=0.009961248317160167)
 estimated_transform.scale_translation_from_x(baseline=base_line)
 
+# Idea here: how to choose the corners to minimize the computation time. Unclear for now
 transformBounds= TransformBounds(baseline=base_line, dt_max_y=dt_max_y,dt_max_z=dt_max_z, angle_max=angle_max)
 top_limit=int(image_height*0.45)
 bottom_limit=int(image_height*0.8)
@@ -163,12 +175,10 @@ computed=[]
 
 for frame in frames:
     frameId=frame["frame_id"]
-    
-    invert_left_right = frame["keypoints_camL"][0][0]<frame["keypoints_camR"][0][0]
-
-    print(frameId,invert_left_right)
-
-    
+    tpl1=frame["keypoints_camL"][0][0]
+    tpl2 =frame["keypoints_camR"][0][0]
+    invert_left_right = True if frameId>1 else False
+    print(f"frame {frameId},invert_left_right {invert_left_right}")
     name_left_kps = "keypoints_camR" if invert_left_right else "keypoints_camL"
     name_right_kps = "keypoints_camL" if invert_left_right else "keypoints_camR"
 
@@ -178,70 +188,72 @@ for frame in frames:
     left_image = cv2.imread(frame[name_left_img] )
     right_image = cv2.imread(frame[name_right_img])
 
-    keypoints_cam1_TL=frame[name_left_kps][0]
-    keypoints_cam2_TL =frame[name_right_kps][0]
-    keypoints_cam1_BL=frame[name_left_kps][3]
-    keypoints_cam2_BL =frame[name_right_kps][3]
+    keypoints_cam1=frame[name_left_kps]
+    keypoints_cam2=frame[name_right_kps]
 
-    if optimize_global:           
+    if should_optimize_global:           
         best_results,ratio = auto_compute_cam2_transform(left_image, right_image,estimatedTransform= estimated_transform, 
-                                                   transformBounds=transformBounds,inlier_threshold=inlier_threshold,verbose=True)
+                                                   transformBounds=transformBounds,inlier_threshold=inlier_threshold,verbose=True,frame_id=frameId)
         best_results.scale_translation_from_x(baseline=base_line)
-        print("refined best")
-        print(ratio,best_results)
+        print("ratio, refined best:",ratio, best_results)
 
-    nb_kps = len(frame[name_left_kps])
-    if nb_kps>4:
-        sub_uv1=[]
-        sub_uv2=[]
-        for i in range(nb_kps):
-            sub_uv1.append(frame[name_left_kps][i])
-            sub_uv2.append(frame[name_right_kps][i])
-            refined_transform_local,total_residual_in_m = getRefinedTransformFromKPMatching(sub_uv1, sub_uv2, initial_params, image_width=image_width, image_height=image_height,bnds=bnds)
-        print(refined_transform_local)
-        print(total_residual_in_m)
 
-    #print(optimized_params_local)
-    #R= optimized_params_local[:3]
-    #t = optimized_params_local[3:6]
-
-    topLeft1,topLeft2,residual_in_m1 = get_3d_point_cam1_2_from_coordinates(
-        tuple(keypoints_cam1_TL), 
-        tuple(keypoints_cam2_TL), image_width, image_height, best_results.rotationMatrix,best_results.translationVector, verbose)
+    # Idea below is to optimize localy the transform, but it is not working well
+    else:
+        nb_kps = len(frame[name_left_kps])
+        if nb_kps>4:
+            sub_uv1=[]
+            sub_uv2=[]
+            for i in range(nb_kps):
+                sub_uv1.append(frame[name_left_kps][i])
+                sub_uv2.append(frame[name_right_kps][i])
+                refined_transform_local,total_residual_in_m = getRefinedTransformFromKPMatching(sub_uv1, sub_uv2, initial_params, image_width=image_width, image_height=image_height,bnds=bnds)
+            print(refined_transform_local)
+            print(total_residual_in_m)
+    # compute sign size and position. In this example, it's on left side, should rather be in top/bottom center
+    
+    keypoints_1_cam1,keypoints_2_cam1=get_2_cam_refpoints(keypoints_cam1)
+    keypoints_1_cam2,keypoints_2_cam2=get_2_cam_refpoints(keypoints_cam2)
+    ## compute top left corner triangulation
+    top_cam1,top_cam2,residual_in_m1 = get_3d_point_cam1_2_from_coordinates(
+        tuple(keypoints_1_cam1), 
+        tuple(keypoints_1_cam2), image_width, image_height, best_results.rotationMatrix,best_results.translationVector, verbose)
 
     if verbose:
-        print(f"3D Point Camera 1: {topLeft1}")
-        print(f"3D Point Camera 2: {topLeft2}")
+        print(f"Top 3D Point Camera 1: {top_cam1}")
+        print(f"Top 3D Point Camera 2: {top_cam2}")
         print(f"Residual: {residual_in_m1}")
 
-
-    bottomLeft1,bottomLeft2,residual_in_m2 = get_3d_point_cam1_2_from_coordinates(
-        tuple(keypoints_cam1_BL), 
-        tuple(keypoints_cam2_BL), image_width, image_height, best_results.rotationMatrix,best_results.translationVector, verbose)
+    ## compute bottom left corner triangulation
+    bottom_cam1,bottom_cam2,residual_in_m2 = get_3d_point_cam1_2_from_coordinates(
+        tuple(keypoints_2_cam1), 
+        tuple(keypoints_2_cam2), image_width, image_height, best_results.rotationMatrix,best_results.translationVector, verbose)
 
     if verbose:
-        print(f"3D Point Camera 1: {bottomLeft1}")
-        print(f"3D Point Camera 2: {bottomLeft2}")
+        print(f"Bottom 3D Point Camera 1: {bottom_cam1}")
+        print(f"Bottom 3D Point Camera 2: {bottom_cam2}")
         print(f"Residual: {residual_in_m2}")
 
 
-    width1 = np.linalg.norm(np.array(bottomLeft1) - np.array(topLeft1))
+    width1 = np.linalg.norm(np.array(bottom_cam1) - np.array(top_cam1))
     print(f"{frameId} width cam1 {width1}")
 
-    width2 = np.linalg.norm(np.array(bottomLeft2) - np.array(topLeft2))
+    width2 = np.linalg.norm(np.array(bottom_cam2) - np.array(top_cam2))
     print(f"width cam2 {width2}")
 
     computed.append({
         "frame_id":frameId,
+        "ratio":round(ratio,2),
+        "invert_left_right":invert_left_right,
         "width1":round(width1,2),
         "width2":round(width2,2),
-        "dx":round(topLeft1[0],2),
-        "dy":round(topLeft1[1],2),
-        "dz":round(topLeft1[2],2),
-        "residual_in_m1":residual_in_m1,
-        "residual_in_m2":residual_in_m2
+        "dx":round(top_cam1[0],2),
+        "dy":round(top_cam1[1],2),
+        "dz":round(top_cam1[2],2),
+        "residual_in_m1":round(residual_in_m1,3),
+        "residual_in_m2":round(residual_in_m2,3),
+        "best_results":best_results
     })
-
 
 if computed:
     headers = computed[0].keys()

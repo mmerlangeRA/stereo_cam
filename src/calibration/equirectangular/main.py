@@ -224,7 +224,7 @@ def auto_compute_cam2_transform(imLeft:cv2.Mat, imRight:cv2.Mat, estimatedTransf
                 d_path=get_output_path(f'{frame_id}_debug{nb_iter}.png')
                 cv2.imwrite(d_path, debug_image)
 
-                logger.debug(f'{frame_id} new best result with {nb_inliers} inliers, iteration is {nb_iter}, residual_per_num_elements is {residual_per_num_elements}')
+                logger.debug(f'{frame_id} new best result with {nb_inliers} inliers out of {nb_good_matches}, iteration is {nb_iter}, residual_per_num_elements is {residual_per_num_elements}')
                 logger.debug(f'{frame_id} optimized_params: {refine_transform}')
                 logger.debug(f'{frame_id} now iter is {nb_iter} and max_iter is {max_iter}')
         nb_iter+=1
