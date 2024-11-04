@@ -144,10 +144,3 @@ python -m unittest discover -s tests
 ## Docker installation
 
 to be done
-
-courbe P2 (a,b) avec largeur d dans plan y=0. transformée par EAC (rot, height) 
-
-on prend points, on cherche a,b,d, rot, height pour minimiser 
-
-fonction qui prend x,y dans plan 0 et donnent coordonnée dans EAC
-=> dans ref cam puis rayons, puis position EAC
